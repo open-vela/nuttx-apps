@@ -529,6 +529,10 @@ config MBEDTLS_SHA512_C
 	bool "Enable SHA-512 cryptographic hash algorithms."
 	default y
 
+config MBEDTLS_SHA3_C
+	bool "Enable SHA-3 cryptographic hash algorithms."
+	default y
+
 config MBEDTLS_SSL_CACHE_C
 	bool "Enable simple SSL cache implementation."
 	default y
