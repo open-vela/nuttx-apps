@@ -1,0 +1,5 @@
+cc_binary {
+    name: "uio_test",
+    srcs: ["uio_test.c"],
+    shared_libs: ["libcutils"],
+}
