@@ -87,6 +87,12 @@ function(nuttx_add_jidl)
       COMMENT "JIDL: generating glue files for ${JIDL_NAME}.jidl")
 
     add_dependencies(${TARGET} ${JIDL_TARGET})
+    # make a link list dep of jidl targets
+    get_property(DEP_JIDL_TARGET GLOBAL PROPERTY GLOBAL_JIDL_TARGET)
+    if(DEP_JIDL_TARGET)
+      add_dependencies(${JIDL_TARGET} ${DEP_JIDL_TARGET})
+    endif()
+    set_property(GLOBAL PROPERTY GLOBAL_JIDL_TARGET ${JIDL_TARGET})
     target_sources(${TARGET} PRIVATE ${JIDL_SRC})
   endforeach()
 
