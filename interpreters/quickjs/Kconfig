@@ -52,11 +52,6 @@ config INTERPRETERS_QUICKJS_DEBUG
 	default n
 	---help---
 		Enable this if you want js debugger support.
-config MEMORY_LEAK_TRACK
-	bool "QuickJS interpreter memory leak track support"
-	default n
-	---help---
-		Enable this if you want js debugger support.
 
 config INTERPRETERS_QUICKJS_CONFIG_TOOL
 	bool "QuickJS interpreter config tool support"
