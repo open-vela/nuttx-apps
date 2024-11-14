@@ -27,6 +27,48 @@ if(CONFIG_TESTING_LTP)
 
   set(TESTDIR ${LTP_UNPACK}/testcases/open_posix_testsuite)
 
+  if(NOT EXISTS ${TESTDIR})
+    FetchContent_Declare(
+      ltp_fetch
+      DOWNLOAD_NAME "ltp-${LTPS_VERSION}.zip"
+      DOWNLOAD_DIR ${CMAKE_CURRENT_LIST_DIR}
+      URL "${LTP_DOWNLOAD_URL}${LTPS_VERSION}.zip" SOURCE_DIR
+          ${CMAKE_CURRENT_LIST_DIR}/ltp BINARY_DIR
+          ${CMAKE_BINARY_DIR}/apps/testing/ltp/ltp
+      PATCH_COMMAND
+        patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0001-pthread_rwlock_unlock-follow-linux.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0002-Use-ifdef-instead-of-if-for-__linux__.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0003-LTP-Re-init-static-variable-to-avoid-errors-during-m.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0004-test-update-ltp-test-case.patch && patch
+        -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0005-ltp-update-pthread_cond_timedwait-testcase.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0006-test-modified-ltp-rwlock-need-init.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0007-pthread_kill-add-usleep-aviod-semcount-overturn.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0008-test-ltp-fix-ltp_interfaces_sigaction_23_10-deadloop.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0009-ltp-modify-user-code-for-fdcheck-compatibility.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0010-ltp-fix-build-warning.patch && patch -p1
+        -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0011-ltp-fix-the-proc.h-header-file-duplicate-inclusion.patch
+        && patch -p1 -d ${LTP_UNPACK} <
+        ${CMAKE_CURRENT_LIST_DIR}/0012-ltp-fix-build-error.patch
+      DOWNLOAD_NO_PROGRESS true
+      TIMEOUT 30)
+
+    FetchContent_GetProperties(ltp_fetch)
+    if(NOT ltp_fetch_POPULATED)
+      FetchContent_Populate(ltp_fetch)
+    endif()
+  endif()
+
   if(EXISTS ${TESTDIR})
     set(BLACKWORDS)
     set(BLACKSRCS)
@@ -61,7 +103,18 @@ if(CONFIG_TESTING_LTP)
       ${TESTDIR}/conformance/definitions/time_h/19-1-buildonly.c
       ${TESTDIR}/conformance/definitions/signal_h/21-1-buildonly.c
       ${TESTDIR}/conformance/definitions/signal_h/27-1-buildonly.c
-      ${TESTDIR}/stress/threads/pthread_kill/stress.c)
+      ${TESTDIR}/conformance/definitions/time_h/19-1-buildonly.c
+      ${TESTDIR}/conformance/interfaces/sem_post/8-1.c
+      ${TESTDIR}/conformance/interfaces/clock_nanosleep/9-1.c
+      ${TESTDIR}/conformance/interfaces/clock_nanosleep/2-2.c
+      ${TESTDIR}/conformance/interfaces/clock_nanosleep/10-1.c
+      ${TESTDIR}/conformance/interfaces/clock_nanosleep/1-5.c
+      ${TESTDIR}/conformance/interfaces/clock_nanosleep/1-3.c
+      ${TESTDIR}/conformance/interfaces/clock_nanosleep/2-3.c
+      ${TESTDIR}/conformance/interfaces/clock_nanosleep/1-4.c
+      ${TESTDIR}/conformance/interfaces/pthread_sigmask/18-1.c
+      ${TESTDIR}/conformance/interfaces/pthread_sigmask/4-1.c
+      ${TESTDIR}/conformance/interfaces/sigprocmask/4-1.c)
 
     if(NOT CONFIG_LIBC_LOCALTIME)
       list(APPEND BLACKSRCS
@@ -69,9 +122,12 @@ if(CONFIG_TESTING_LTP)
            ${TESTDIR}/conformance/definitions/time_h/35-3-buildonly.c)
     endif()
 
-    list(APPEND BLACKSRCS
-         ${TESTDIR}/conformance/definitions/time_h/35-1-buildonly.c
-         ${TESTDIR}/conformance/definitions/time_h/35-2-buildonly.c)
+    list(
+      APPEND
+      BLACKSRCS
+      ${TESTDIR}/conformance/definitions/time_h/35-1-buildonly.c
+      ${TESTDIR}/conformance/definitions/time_h/35-2-buildonly.c
+      ${TESTDIR}/stress/threads/pthread_kill/stress.c)
 
     if(NOT CONFIG_PTHREAD_SPINLOCKS)
       list(APPEND BLACKSRCS
@@ -274,6 +330,26 @@ if(CONFIG_TESTING_LTP)
     include_directories(${TESTDIR}/include)
     include_directories(${TESTDIR}/../../include)
 
+    add_compile_options(
+      -Wall
+      -Wno-strict-prototypes
+      -Wno-return-type
+      -Wno-format
+      -Wno-uninitialized
+      -Wno-unused-variable
+      -Wno-unused-function
+      -Wno-unused-but-set-variable
+      -Wno-unused-value
+      -Wno-int-conversion
+      -Wno-shadow
+      -Wno-incompatible-pointer-types
+      -Wno-overflow
+      -Wno-int-to-pointer-cast)
+
+    if(APPLE)
+      add_compile_options(-Wno-integer-overflow -Wno-absolute-value)
+    endif()
+
     list(LENGTH LTP_MAINCSRCS SOURCE_FILES_COUNT)
     math(EXPR LAST_INDEX "${SOURCE_FILES_COUNT} - 1")
 
@@ -288,67 +364,11 @@ if(CONFIG_TESTING_LTP)
         STACKSIZE
         ${CONFIG_TESTING_LTP_STACKSIZE}
         SRCS
-        ${SOURCE_FILES}
-        ${LTP_CSRCS})
+        ${SOURCE_FILES})
     endforeach()
   endif()
 
-  add_compile_options(
-    -Wall
-    -Wno-strict-prototypes
-    -Wno-return-type
-    -Wno-format
-    -Wno-uninitialized
-    -Wno-unused-variable
-    -Wno-unused-function
-    -Wno-unused-but-set-variable
-    -Wno-unused-value
-    -Wno-int-conversion
-    -Wno-shadow
-    -Wno-incompatible-pointer-types
-    -Wno-overflow
-    -Wno-int-to-pointer-cast)
-
-  if(APPLE)
-    add_compile_options(-Wno-integer-overflow -Wno-absolute-value)
-  endif()
-
-  file(GLOB_RECURSE GIT_REPOSITORY ${LTP_UNPACK}/.git)
-  if(NOT GIT_REPOSITORY)
-    FetchContent_Declare(
-      ltp
-      DOWNLOAD_NAME "ltp-${LTPS_VERSION}.zip"
-      DOWNLOAD_DIR ${CMAKE_CURRENT_LIST_DIR}
-      URL "${LTP_DOWNLOAD_URL}${LTPS_VERSION}.zip" SOURCE_DIR
-          ${CMAKE_CURRENT_LIST_DIR}/ltp
-      PATCH_COMMAND
-        patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0001-pthread_rwlock_unlock-follow-linux.patch
-        && patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0002-Use-ifdef-instead-of-if-for-__linux__.patch
-        && patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0003-LTP-Re-init-static-variable-to-avoid-errors-during-m.patch
-        && patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0004-test-update-ltp-test-case.patch && patch
-        -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0005-ltp-update-pthread_cond_timedwait-testcase.patch
-        && patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0006-test-modified-ltp-rwlock-need-init.patch
-        && patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0007-pthread_kill-add-usleep-aviod-semcount-overturn.patch
-        && patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0008-test-ltp-fix-ltp_interfaces_sigaction_23_10-deadloop.patch
-        && patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0009-ltp-modify-user-code-for-fdcheck-compatibility.patch
-        && patch -p1 -d ${LTP_UNPACK} <
-        ${CMAKE_CURRENT_LIST_DIR}/0010-ltp-fix-build-warning.patch
-      DOWNLOAD_NO_PROGRESS true
-      TIMEOUT 30)
-
-    FetchContent_GetProperties(ltp)
-    if(NOT ltp_POPULATED)
-      FetchContent_Populate(ltp)
-    endif()
-  endif()
+  nuttx_add_library(ltp)
+  target_sources(ltp PRIVATE ${LTP_CSRCS})
 
 endif()
