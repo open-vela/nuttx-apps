@@ -633,7 +633,7 @@ static int ls_recursive(FAR struct nsh_vtbl_s *vtbl, FAR const char *dirpath,
       free(newpath);
     }
 
-  return ret;
+  return OK;
 }
 
 #endif /* !CONFIG_NSH_DISABLE_LS */
