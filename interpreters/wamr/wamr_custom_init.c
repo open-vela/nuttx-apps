@@ -33,8 +33,6 @@
 
 #include "wasm_native.h"
 
-#include "wamr_custom_init.h"
-
 #ifdef CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY
 #include "wamr_external_module_proto.h"
 #endif
