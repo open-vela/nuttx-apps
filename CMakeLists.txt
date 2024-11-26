@@ -34,6 +34,7 @@ if(CONFIG_APPS_DIR)
   include(nuttx_add_makefile)
   include(nuttx_add_luamod)
   include(nuttx_add_wamrmod)
+  include(nuttx_wasm_interface)
   nuttx_add_library(apps)
   if(NOT EXISTS {NUTTX_APPS_BINDIR}/dummy.c)
     file(TOUCH ${NUTTX_APPS_BINDIR}/dummy.c)
@@ -66,7 +67,6 @@ add_subdirectory(platform)
 add_subdirectory(sdr)
 add_subdirectory(system)
 add_subdirectory(testing)
-add_subdirectory(tools)
 add_subdirectory(videoutils)
 add_subdirectory(wireless)
 
@@ -88,6 +88,7 @@ if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/vendor/CMakeLists.txt)
   add_subdirectory(vendor)
 endif()
 
+add_subdirectory(tools) # after traversing all subdirectories
 add_subdirectory(builtin) # must be last
 
 nuttx_generate_kconfig()
