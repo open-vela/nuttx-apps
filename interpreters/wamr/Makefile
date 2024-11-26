@@ -46,9 +46,7 @@ WAMR_NEED_CUSTOM_INIT = n
 
 # Check if we need to build custom init code
 
-ifeq ($(CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY),y)
 WAMR_NEED_CUSTOM_INIT = y
-endif
 
 # If we need custom init code, add it to the build
 ifeq ($(WAMR_NEED_CUSTOM_INIT),y)
@@ -69,8 +67,6 @@ $(WAMR_UNPACK): $(WAMR_TARBALL)
 	$(Q) touch $(WAMR_UNPACK)
 
 # Register the external WAMR module
-
-ifeq ($(CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY),y)
 
 PDATLIST = $(strip $(call RWILDCARD, registry, *.pdat))
 BDATLIST = $(strip $(call RWILDCARD, registry, *.bdat))
@@ -95,7 +91,6 @@ else
 endif
 
 depend:: $(GLUECSRCS) wamr_external_module_list.h wamr_external_module_proto.h
-endif # CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY
 
 clean::
 	$(call DELFILE, wamr_external_module_list.h)
@@ -104,6 +99,7 @@ clean::
 clean_context::
 	$(call DELFILE, $(BDATLIST))
 	$(call DELFILE, $(PDATLIST))
+	$(call DELFILE, registry$(DELIM).updated)
 
 # Download and unpack tarball if no git repo found
 ifeq ($(wildcard $(WAMR_UNPACK)/.git),)

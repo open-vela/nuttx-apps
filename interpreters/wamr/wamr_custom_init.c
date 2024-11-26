@@ -32,10 +32,7 @@
 #include <iconv.h>
 
 #include "wasm_native.h"
-
-#ifdef CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY
 #include "wamr_external_module_proto.h"
-#endif
 
 /****************************************************************************
  * Private Data
@@ -43,12 +40,10 @@
 
 typedef bool (*module_register_t)(void);
 
-#ifdef CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY
 static const module_register_t g_wamr_modules[] =
 {
 #include "wamr_external_module_list.h"
 };
-#endif
 
 /****************************************************************************
  * Public Functions
@@ -65,7 +60,6 @@ bool wamr_custom_init(RuntimeInitArgs *init_args)
 
   /* Add extra init hook here */
 
-#ifdef CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY
   for (int i = 0; i < nitems(g_wamr_modules); i++)
     {
       ret = g_wamr_modules[i]();
@@ -74,7 +68,6 @@ bool wamr_custom_init(RuntimeInitArgs *init_args)
           return ret;
         }
     }
-#endif
 
   return ret;
 }

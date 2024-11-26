@@ -77,17 +77,23 @@ if(CONFIG_INTERPRETERS_WAMR)
     DEPENDS
     wamr)
 
-  if(CONFIG_INTERPRETERS_WAMR_LIBC_NUTTX
-     OR CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY)
-    nuttx_append_source_file_properties(
-      ${WAMR_DIR}/product-mini/platforms/nuttx/main.c COMPILE_FLAGS
-      -Dwasm_runtime_full_init=wamr_custom_init)
-    target_sources(wamr PRIVATE wamr_custom_init.c)
-  endif()
+  nuttx_append_source_file_properties(
+    ${WAMR_DIR}/product-mini/platforms/nuttx/main.c COMPILE_FLAGS
+    -Dwasm_runtime_full_init=wamr_custom_init)
+  target_sources(wamr PRIVATE wamr_custom_init.c)
+
+  set(WAMR_MODULE_LIST ${CMAKE_BINARY_DIR}/wamrmod/wamr_external_module_list.h)
+  set(WAMR_MODULE_PROTO
+      ${CMAKE_BINARY_DIR}/wamrmod/wamr_external_module_proto.h)
+
+  add_custom_target(
+    wamr_module_gen
+    COMMAND ${CMAKE_COMMAND} -E touch ${WAMR_MODULE_LIST}
+    COMMAND ${CMAKE_COMMAND} -E touch ${WAMR_MODULE_PROTO})
+
+  nuttx_add_dependencies(TARGET wamr DEPENDS wamr_module_gen)
 
   # Add ${CMAKE_BINARY_DIR}/wamrmod to the include directories
-  if(CONFIG_INTERPRETERS_WAMR_EXTERNAL_MODULE_REGISTRY)
-    target_include_directories(wamr PRIVATE ${CMAKE_BINARY_DIR}/wamrmod)
-  endif()
+  target_include_directories(wamr PRIVATE ${CMAKE_BINARY_DIR}/wamrmod)
 
 endif()
