@@ -58,10 +58,6 @@ endif
 
 ifeq ($(CONFIG_LV_USE_DRAW_VG_LITE),y)
 CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/../$(CONFIG_LV_DRAW_VG_LITE_INCLUDE)
-
-# Disable optimization for vg_lite_path.c to avoid a compiler bug.
-# See: https://bugs.launchpad.net/gcc-arm-embedded/+bug/1982289
-$(CURDIR)/lvgl/src/draw/vg_lite/lv_vg_lite_path.c_CFLAGS += -O0
 endif
 
 ifneq ($(CONFIG_LV_ASSERT_HANDLER_INCLUDE), "")
