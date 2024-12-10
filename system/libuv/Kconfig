@@ -62,9 +62,11 @@ config LIBUV_UTILS_NONE
 
 config LIBUV_UTILS_TEST
 	bool "uv_run_tests"
+	select LIBC_EXECFUNCS
 
 config LIBUV_UTILS_BENCHMARK
 	bool "uv_run_benchmarks"
+	select LIBC_EXECFUNCS
 
 endchoice
 
