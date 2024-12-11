@@ -22,7 +22,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_3DES_CBC)
     nuttx_add_application(
       NAME
-      des3cbc
+      cmocka_des3cbc
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -38,7 +38,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_AES_XTS)
     nuttx_add_application(
       NAME
-      aesxts
+      cmocka_aesxts
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -54,7 +54,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_AES_CTR)
     nuttx_add_application(
       NAME
-      aesctr
+      cmocka_aesctr
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -70,7 +70,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_AES_CBC)
     nuttx_add_application(
       NAME
-      aescbc
+      cmocka_aescbc
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -86,7 +86,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_HMAC)
     nuttx_add_application(
       NAME
-      hmac
+      cmocka_hmac
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -102,7 +102,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_HASH)
     nuttx_add_application(
       NAME
-      hash
+      cmocka_hash
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -118,7 +118,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_CRC32)
     nuttx_add_application(
       NAME
-      crc32
+      cmocka_crc32
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -134,7 +134,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_AES_CMAC)
     nuttx_add_application(
       NAME
-      aescmac
+      cmocka_aescmac
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -150,7 +150,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_ECDSA)
     nuttx_add_application(
       NAME
-      ecdsa
+      cmocka_ecdsa
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -166,7 +166,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_ECDH)
     nuttx_add_application(
       NAME
-      dhm
+      cmocka_dhm
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE
@@ -182,7 +182,7 @@ if(CONFIG_TESTING_CRYPTO)
   if(CONFIG_TESTING_CRYPTO_RSA)
     nuttx_add_application(
       NAME
-      rsa
+      cmocka_rsa
       PRIORITY
       ${CONFIG_TESTING_CRYPTO_PRIORITY}
       STACKSIZE

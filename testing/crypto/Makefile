@@ -22,57 +22,57 @@ include $(APPDIR)/Make.defs
 
 # Generic file system stress test application info
 ifeq ($(CONFIG_TESTING_CRYPTO_3DES_CBC),y)
-PROGNAME += des3cbc
+PROGNAME += cmocka_des3cbc
 MAINSRC  += 3descbc.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_AES_XTS),y)
-PROGNAME += aesxts
+PROGNAME += cmocka_aesxts
 MAINSRC  += aesxts.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_AES_CTR),y)
-PROGNAME += aesctr
+PROGNAME += cmocka_aesctr
 MAINSRC  += aesctr.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_AES_CBC),y)
-PROGNAME += aescbc
+PROGNAME += cmocka_aescbc
 MAINSRC  += aescbc.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_HMAC),y)
-PROGNAME += hmac
+PROGNAME += cmocka_hmac
 MAINSRC  += hmac.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_HASH),y)
-PROGNAME += hash
+PROGNAME += cmocka_hash
 MAINSRC +=  hash.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_CRC32),y)
-PROGNAME += crc32
+PROGNAME += cmocka_crc32
 MAINSRC +=  crc32.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_AES_CMAC),y)
-PROGNAME += aescmac
+PROGNAME += cmocka_aescmac
 MAINSRC +=  aescmac.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_ECDSA),y)
-PROGNAME += ecdsa
+PROGNAME += cmocka_ecdsa
 MAINSRC +=  ecdsa.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_ECDH),y)
-PROGNAME += dhm
+PROGNAME += cmocka_dhm
 MAINSRC +=  dhm.c
 endif
 
 ifeq ($(CONFIG_TESTING_CRYPTO_RSA),y)
-PROGNAME += rsa
+PROGNAME += cmocka_rsa
 MAINSRC +=  rsa.c
 endif
 
