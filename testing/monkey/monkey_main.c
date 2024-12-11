@@ -523,6 +523,15 @@ static enum monkey_wait_res_e monkey_wait(uint32_t ms)
 }
 
 /****************************************************************************
+ * Name: signal_handler
+ ****************************************************************************/
+
+static void signal_handler(int sig)
+{
+  MONKEY_LOG_WARN("Recv sig: %d", sig);
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -544,6 +553,12 @@ int main(int argc, FAR char *argv[])
   struct monkey_param_s param;
   FAR struct monkey_s *monkey;
   parse_commandline(argc, argv, &param);
+
+  /* Add signal handler to avoid system default handler */
+
+  signal(SIGTSTP, &signal_handler);
+  signal(SIGCONT, &signal_handler);
+  signal(SIGTERM, &signal_handler);
 
   monkey = monkey_init(&param);
 
