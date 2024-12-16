@@ -28,10 +28,19 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/time.h>
+
 #include <cmocka.h>
 
 #include "test_tcp.h"
 #include "utils.h"
+
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
+
+#define NETDEV_NAME          "lo"
+#define TEST_SND_RCV_TIMEOUT 10000
 
 /****************************************************************************
  * Public Functions
@@ -85,5 +94,55 @@ int test_tcp_common_teardown(FAR void **state)
       tcp_state->client_fd = -1;
     }
 
+#ifdef CONFIG_NET_PKT
+  nettest_dump_destroy(&tcp_state->dump_state);
+#endif
+
   return 0;
+}
+
+/****************************************************************************
+ * Name: test_tcp_common_setup
+ ****************************************************************************/
+
+int test_tcp_common_setup(FAR struct nettest_tcp_state_s *tcp_state,
+                          int family, nettest_filter_t filter)
+{
+  struct timeval tv;
+  int ret;
+
+  assert(family == AF_INET || family == AF_INET6);
+
+  tcp_state->client_fd = socket(family, SOCK_STREAM, 0);
+  assert_return_code(tcp_state->client_fd, errno);
+
+  tv.tv_sec  = 0;
+  tv.tv_usec = TEST_SND_RCV_TIMEOUT;
+  ret = setsockopt(tcp_state->client_fd, SOL_SOCKET, SO_RCVTIMEO,
+                   &tv, sizeof(tv));
+  if (ret < 0)
+    {
+      goto errout;
+    }
+
+  ret = setsockopt(tcp_state->client_fd, SOL_SOCKET, SO_SNDTIMEO,
+                   &tv, sizeof(tv));
+  if (ret < 0)
+    {
+      goto errout;
+    }
+
+#ifdef CONFIG_NET_PKT
+  if (filter != NULL)
+    {
+      ret = nettest_dump_setup(&tcp_state->dump_state, NETDEV_NAME,
+                               filter, 0);
+    }
+#endif
+
+  return ret;
+
+errout:
+  close(tcp_state->client_fd);
+  return ret;
 }

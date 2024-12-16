@@ -27,14 +27,19 @@
 
 #include <pthread.h>
 
+#include "utils.h"
+
 /****************************************************************************
  * Public Types
  ****************************************************************************/
 
 struct nettest_tcp_state_s
 {
-  int       client_fd;
-  pthread_t server_tid;
+  int               client_fd;
+  pthread_t         server_tid;
+#ifdef CONFIG_NET_PKT
+  struct net_dump_s dump_state;
+#endif
 };
 
 /****************************************************************************
@@ -58,6 +63,13 @@ int test_tcp_group_teardown(FAR void **state);
  ****************************************************************************/
 
 int test_tcp_common_teardown(FAR void **state);
+
+/****************************************************************************
+ * Name: test_tcp_common_setup
+ ****************************************************************************/
+
+int test_tcp_common_setup(FAR struct nettest_tcp_state_s *tcp_state,
+                          int family, nettest_filter_t filter);
 
 /****************************************************************************
  * Name: test_tcp_connect_ipv4_setup
@@ -86,4 +98,32 @@ int test_tcp_connect_ipv6_setup(FAR void **state);
 
 void test_tcp_connect_ipv6(FAR void **state);
 #endif
+
+/****************************************************************************
+ * Name: test_tcp_connect_solinger_setup
+ ****************************************************************************/
+
+#ifdef CONFIG_NET_PKT
+#ifdef CONFIG_NET_SOLINGER
+int test_tcp_connect_solinger_setup(FAR void **state);
+
+/****************************************************************************
+ * Name: test_tcp_connect_solinger
+ ****************************************************************************/
+
+void test_tcp_connect_solinger(FAR void **state);
+#endif
+
+/****************************************************************************
+ * Name: test_tcp_connect_rst_setup
+ ****************************************************************************/
+
+int test_tcp_connect_rst_setup(FAR void **state);
+
+/****************************************************************************
+ * Name: test_tcp_connect_rst
+ ****************************************************************************/
+
+void test_tcp_connect_rst(FAR void **state);
+#endif /* CONFIG_NET_PKT */
 #endif /* __APPS_TESTING_NETTEST_TCP_TEST_TCP_H */

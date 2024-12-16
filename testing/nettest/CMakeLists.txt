@@ -33,6 +33,16 @@ if(CONFIG_TESTING_NET_TEST)
       list(APPEND SRCS ${CMAKE_CURRENT_LIST_DIR}/tcp/test_tcp_connect_ipv6.c)
     endif()
 
+    if(CONFIG_NET_PKT)
+      list(APPEND SRCS ${CMAKE_CURRENT_LIST_DIR}/tcp/test_tcp_connect_rst.c
+           ${CMAKE_CURRENT_LIST_DIR}/utils/nettest_netdump.c)
+
+      if(CONFIG_NET_SOLINGER)
+        list(APPEND SRCS
+             ${CMAKE_CURRENT_LIST_DIR}/tcp/test_tcp_connect_solinger.c)
+      endif()
+    endif()
+
     nuttx_add_application(
       NAME
       cmocka_net_tcp

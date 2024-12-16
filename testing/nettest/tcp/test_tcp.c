@@ -48,6 +48,16 @@ int main(int argc, FAR char *argv[])
                                       test_tcp_connect_ipv6_setup,
                                       test_tcp_common_teardown),
 #endif
+#ifdef CONFIG_NET_PKT
+#ifdef CONFIG_NET_SOLINGER
+      cmocka_unit_test_setup_teardown(test_tcp_connect_solinger,
+                                      test_tcp_connect_solinger_setup,
+                                      test_tcp_common_teardown),
+#endif
+      cmocka_unit_test_setup_teardown(test_tcp_connect_rst,
+                                      test_tcp_connect_rst_setup,
+                                      test_tcp_common_teardown),
+#endif /* CONFIG_NET_PKT */
     };
 
   return cmocka_run_group_tests(tcp_tests, test_tcp_group_setup,

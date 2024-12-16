@@ -27,8 +27,8 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+
 #include <cmocka.h>
-#include <sys/time.h>
 
 #include "test_tcp.h"
 #include "utils.h"
@@ -52,23 +52,8 @@
 int test_tcp_connect_ipv6_setup(FAR void **state)
 {
   FAR struct nettest_tcp_state_s *tcp_state = *state;
-  struct timeval tv;
-  int ret;
 
-  tcp_state->client_fd = socket(PF_INET6, SOCK_STREAM, 0);
-  assert_true(tcp_state->client_fd > 0);
-
-  tv.tv_sec  = 0;
-  tv.tv_usec = 10000;
-  ret = setsockopt(tcp_state->client_fd, SOL_SOCKET,
-                   SO_RCVTIMEO, &tv, sizeof(tv));
-  assert_return_code(ret, errno);
-
-  ret = setsockopt(tcp_state->client_fd, SOL_SOCKET,
-                   SO_SNDTIMEO, &tv, sizeof(tv));
-  assert_return_code(ret, errno);
-
-  return 0;
+  return test_tcp_common_setup(tcp_state, AF_INET6, NULL);
 }
 
 /****************************************************************************

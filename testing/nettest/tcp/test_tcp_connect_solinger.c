@@ -1,5 +1,5 @@
 /****************************************************************************
- * apps/testing/nettest/tcp/test_tcp_connect_ipv4.c
+ * apps/testing/nettest/tcp/test_tcp_connect_solinger.c
  *
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -22,54 +22,58 @@
  * Included Files
  ****************************************************************************/
 
-#include <netinet/in.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/socket.h>
-
 #include <cmocka.h>
+
+#include <nuttx/net/tcp.h>
 
 #include "test_tcp.h"
 #include "utils.h"
 
 /****************************************************************************
- * Pre-processor Definitions
+ * Private Functions
  ****************************************************************************/
 
-#define TEST_LOOP_CNT    5
-#define TEST_BUFFER_SIZE 80
-#define TEST_MSG         "loopback message"
+static bool filter(FAR uint8_t *buf)
+{
+  return nettest_filter_tcp_state(NET_LL_LOOPBACK, TCP_RST, buf);
+}
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
 /****************************************************************************
- * Name: test_tcp_connect_ipv4_setup
+ * Name: test_tcp_connect_solinger_setup
  ****************************************************************************/
 
-int test_tcp_connect_ipv4_setup(FAR void **state)
+int test_tcp_connect_solinger_setup(FAR void **state)
 {
   FAR struct nettest_tcp_state_s *tcp_state = *state;
 
-  return test_tcp_common_setup(tcp_state, AF_INET, NULL);
+  return test_tcp_common_setup(tcp_state, AF_INET, filter);
 }
 
 /****************************************************************************
- * Name: test_tcp_connect_ipv4
+ * Name: test_tcp_connect_solinger
  ****************************************************************************/
 
-void test_tcp_connect_ipv4(FAR void **state)
+void test_tcp_connect_solinger(FAR void **state)
 {
   FAR struct nettest_tcp_state_s *tcp_state = *state;
   struct sockaddr_in myaddr;
-  char outbuf[TEST_BUFFER_SIZE];
-  char inbuf[TEST_BUFFER_SIZE];
+  struct linger so_linger;
   int addrlen;
   int ret;
-  int len;
+
+  so_linger.l_onoff = TRUE;
+  so_linger.l_linger = 0;
+  ret = setsockopt(tcp_state->client_fd, SOL_SOCKET,
+                   SO_LINGER, &so_linger, sizeof so_linger);
+  assert_return_code(ret, errno);
 
   addrlen = nettest_lo_addr((FAR struct sockaddr *)&myaddr, AF_INET);
 
@@ -77,17 +81,10 @@ void test_tcp_connect_ipv4(FAR void **state)
                 addrlen);
   assert_return_code(ret, errno);
 
-  for (int i = 0; i < TEST_LOOP_CNT; i++)
-    {
-      strcpy(outbuf, TEST_MSG);
-      len = strlen(outbuf);
-      ret = send(tcp_state->client_fd, outbuf, len, 0);
-      assert_true(ret == len);
+  close(tcp_state->client_fd);
+  tcp_state->client_fd = -1;
 
-      ret = recv(tcp_state->client_fd, inbuf, TEST_BUFFER_SIZE, 0);
-      assert_true(ret == len);
+  nettest_netdump_stop(&tcp_state->dump_state);
 
-      ret = strncmp(inbuf, TEST_MSG, len);
-      assert_true(ret == 0);
-    }
+  assert_int_equal(sq_count(&tcp_state->dump_state.data), 1);
 }

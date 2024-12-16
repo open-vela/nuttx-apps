@@ -28,7 +28,7 @@ MODULE    = $(CONFIG_TESTING_NET_TEST)
 
 ifeq ($(CONFIG_TESTING_NET_TEST),y)
 
-CFLAGS += -I$(NETTEST_UTILS_DIR)
+CFLAGS   += -I$(NETTEST_UTILS_DIR)
 
 ifeq ($(CONFIG_TESTING_NET_TCP),y)
 MAINSRC  += tcp/test_tcp.c
@@ -41,6 +41,15 @@ endif
 
 ifeq ($(CONFIG_NET_IPv6), y)
 CSRCS    += tcp/test_tcp_connect_ipv6.c
+endif
+
+ifeq ($(CONFIG_NET_PKT), y)
+CSRCS    += tcp/test_tcp_connect_rst.c utils/nettest_netdump.c
+
+ifeq ($(CONFIG_NET_SOLINGER), y)
+CSRCS    += tcp/test_tcp_connect_solinger.c
+endif
+
 endif
 
 endif
