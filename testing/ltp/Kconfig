@@ -13,7 +13,7 @@ if TESTING_LTP
 
 config TESTING_LTP_STACKSIZE
 	int "Linux Test Project stack size"
-	default 4096
+	default 8192
 
 config TESTING_LTP_KERNEL
 	bool "Enable LTP Linux kernel test cases"
