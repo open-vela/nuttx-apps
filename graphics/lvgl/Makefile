@@ -26,7 +26,6 @@ LVGL_DIR = .
 LVGL_DIR_NAME = lvgl
 
 -include ./lvgl/lvgl.mk
--include ./ext/Makefile
 
 ifneq ($(CONFIG_LV_USE_LIBPNG),)
 CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libpng

@@ -26,6 +26,5 @@ config LV_GPU_G2D_INCLUDE_PATH
 	default ""
 
 osource "$APPSDIR/graphics/lvgl/lvgl/Kconfig"
-osource "$APPSDIR/graphics/lvgl/ext/Kconfig"
 
 endif # GRAPHICS_LVGL
