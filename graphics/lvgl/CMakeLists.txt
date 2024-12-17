@@ -74,44 +74,72 @@ if(CONFIG_GRAPHICS_LVGL)
   target_include_directories(lvgl PRIVATE ${LVGL_DIR})
   target_compile_options(lvgl PRIVATE -Wno-shadow)
 
+  if(CONFIG_LV_USE_LIBPNG)
+    target_include_directories(
+      lvgl PRIVATE ${NUTTX_APPS_DIR}/external/libpng
+                   ${NUTTX_APPS_DIR}/external/libpng/libpng)
+  endif()
+
+  if(CONFIG_LV_USE_LIBWEBP)
+    target_include_directories(
+      lvgl PRIVATE ${NUTTX_APPS_DIR}/external/libwebp/libwebp/src)
+  endif()
+
+  if(CONFIG_LV_USE_LIBJPEG_TURBO)
+    target_include_directories(
+      lvgl PRIVATE ${NUTTX_APPS_DIR}/external/libjpeg-turbo/libjpeg-turbo)
+  endif()
+
+  if(CONFIG_LV_USE_FFMPEG)
+    target_include_directories(lvgl
+                               PRIVATE ${NUTTX_APPS_DIR}/external/ffmpeg/ffmpeg)
+  endif()
+
+  if(CONFIG_LV_USE_RLOTTIE)
+    target_include_directories(
+      lvgl PRIVATE ${NUTTX_APPS_DIR}/external/rlottie/rlottie/inc)
+  endif()
+
+  if(CONFIG_LVX_USE_QRSCAN)
+    target_include_directories(
+      lvgl PRIVATE ${NUTTX_APPS_DIR}/external/quirc/quirc/lib)
+  endif()
+
+  if(CONFIG_LV_GPU_G2D_INCLUDE_PATH)
+    target_include_directories(
+      lvgl PRIVATE ${NUTTX_APPS_DIR}/../${CONFIG_LV_GPU_G2D_INCLUDE_PATH})
+  endif()
+
+  if(CONFIG_LV_USE_DRAW_VG_LITE)
+    target_include_directories(
+      lvgl PRIVATE ${NUTTX_APPS_DIR}/../${CONFIG_LV_DRAW_VG_LITE_INCLUDE})
+  endif()
+
   if(NOT CONFIG_LV_ASSERT_HANDLER_INCLUDE STREQUAL "")
     target_compile_definitions(lvgl PRIVATE "LV_ASSERT_HANDLER=ASSERT(0)\;")
   endif()
 
-  if(CONFIG_LV_USE_FREETYPE)
-    if(NOT CONFIG_LIB_FREETYPE)
-      message(WARNING "LIB_FREETYPE is not enabled")
-    endif()
-    nuttx_add_dependencies(TARGET lvgl DEPENDS freetype)
+  if(CONFIG_LV_USE_PERF_MONITOR AND CONFIG_SCHED_CPULOAD)
+    target_compile_definitions(lvgl
+                               PRIVATE LV_SYSMON_GET_IDLE=lv_nuttx_get_idle)
   endif()
 
-  if(CONFIG_LV_USE_LIBPNG)
-    if(NOT CONFIG_LIB_PNG)
-      message(WARNING "LIB_PNG is not enabled")
-    endif()
-    nuttx_add_dependencies(TARGET lvgl DEPENDS png_static)
-  endif()
-
-  if(CONFIG_LV_USE_LIBWEBP)
-    if(NOT CONFIG_LIB_WEBP)
-      message(WARNING "LIB_WEBP is not enabled")
-    endif()
-    nuttx_add_dependencies(TARGET lvgl DEPENDS webpdecoder)
-  endif()
-
-  if(CONFIG_LV_USE_FFMPEG)
-    message(FATAL_ERROR "FFMPEG is not supported yet")
-  endif()
-
-  if(CONFIG_LV_USE_RLOTTIE)
-    message(FATAL_ERROR "RLOTTIE is not supported yet")
-  endif()
-
-  if(CONFIG_LV_USE_LIBJPEG_TURBO)
-    if(NOT CONFIG_LIB_JPEG_TURBO)
-      message(WARNING "LIB_JPEG_TURBO is not enabled")
-    endif()
-    nuttx_add_dependencies(TARGET lvgl DEPENDS turbojpeg-static)
+  if(CONFIG_SCHED_INSTRUMENTATION AND CONFIG_LV_USE_PROFILER)
+    target_compile_definitions(
+      lvgl
+      PRIVATE
+        "LV_PROFILER_BEGIN=sched_note_beginex(NOTE_TAG_GRAPHICS, __func__)")
+    target_compile_definitions(
+      lvgl
+      PRIVATE "LV_PROFILER_END=sched_note_endex(NOTE_TAG_GRAPHICS, __func__)")
+    target_compile_definitions(
+      lvgl
+      PRIVATE
+        "LV_PROFILER_BEGIN_TAG(str)=sched_note_beginex(NOTE_TAG_GRAPHICS, str)")
+    target_compile_definitions(
+      lvgl
+      PRIVATE
+        "LV_PROFILER_END_TAG(str)=sched_note_endex(NOTE_TAG_GRAPHICS, str)")
   endif()
 
   if(NOT ${CONFIG_LV_OPTLEVEL} STREQUAL "")
