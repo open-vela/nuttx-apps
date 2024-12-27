@@ -153,7 +153,7 @@ static int do_rexec(FAR struct rexec_arg_s *arg)
 
 int main(int argc, FAR char **argv)
 {
-  char cmd[CONFIG_NSH_LINELEN];
+  char cmd[LINE_MAX];
   struct rexec_arg_s arg;
   int option;
   int i;
