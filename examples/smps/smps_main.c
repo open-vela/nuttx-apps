@@ -40,19 +40,9 @@
 #include <nuttx/fs/fs.h>
 #include <nuttx/power/smps.h>
 
-#if defined(CONFIG_EXAMPLES_SMPS)
-
-#ifndef CONFIG_DRIVERS_SMPS
-#  error "Smps example requires smps support"
-#endif
-
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
-
-#ifndef CONFIG_LIBC_FLOATINGPOINT
-#  error "CONFIG_LIBC_FLOATINGPOINT must be set!"
-#endif
 
 #ifndef CONFIG_EXAMPLES_SMPS_TIME_DEFAULT
 #  define CONFIG_EXAMPLES_SMPS_TIME_DEFAULT 10
@@ -635,4 +625,3 @@ errout:
   return 0;
 }
 
-#endif /* CONFIG_EXAMPLE_SMPS */
