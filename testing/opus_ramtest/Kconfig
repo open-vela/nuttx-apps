@@ -5,7 +5,7 @@
 
 config TESTING_OPUS_RAMTEST
 	tristate "opus decode ram test"
-	depends on LIB_OPUS && CODECS_HASH_MD5
+	depends on LIB_OPUS && CODECS_HASH_MD5 && NETUTILS_CODECS && LIB_OPUS_DEMO
 	default n
 
 if TESTING_OPUS_RAMTEST
