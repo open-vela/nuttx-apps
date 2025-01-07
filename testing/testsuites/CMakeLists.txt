@@ -250,7 +250,8 @@ if(CONFIG_TEST_TELEPHONY)
     ${CMAKE_CURRENT_SOURCE_DIR}/kernel/telephony/telephony_sms_test.c
     ${CMAKE_CURRENT_SOURCE_DIR}/kernel/telephony/telephony_network_test.c
     ${CMAKE_CURRENT_SOURCE_DIR}/kernel/telephony/telephony_common_test.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/kernel/telephony/telephony_ims_test.c)
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernel/telephony/telephony_ims_test.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/kernel/telephony/telephony_ss_test.c)
   nuttx_add_application(
     NAME
     cmocka_telephony_test
