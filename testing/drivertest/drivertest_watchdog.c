@@ -287,14 +287,14 @@ static int capture_callback(int irq, FAR void *context, FAR void *arg)
 }
 
 /****************************************************************************
- * Name: test_case_wdog_01
+ * Name: drivertest_watchdog_feeding
  *
  * Description:
  *   This function is used to test whether the watchdog can take effect after
  *   timeout without relying on automatic feeding
  ****************************************************************************/
 
-static void test_case_wdog_01(FAR void **state)
+static void drivertest_watchdog_feeding(FAR void **state)
 {
   int dev_fd;
   int ret;
@@ -346,14 +346,14 @@ static void test_case_wdog_01(FAR void **state)
 }
 
 /****************************************************************************
- * Name: test_case_wdog_02
+ * Name: drivertest_watchdog_interrupts
  *
  * Description:
  *   This function is used to test whether the watchdog takes effect when
  *   the interrupt is turned off.
  ****************************************************************************/
 
-static void test_case_wdog_02(FAR void **state)
+static void drivertest_watchdog_interrupts(FAR void **state)
 {
   FAR struct wdg_state_s *wdg_state;
   struct boardioc_reset_cause_s reset_cause;
@@ -389,14 +389,14 @@ static void wdg_wdentry(wdparm_t arg)
 }
 
 /****************************************************************************
- * Name: test_case_wdog_03
+ * Name: drivertest_watchdog_loop
  *
  * Description:
  *   This function is used to test whether the infinite loop will start
  *   watchdog after opening the interrupt.
  ****************************************************************************/
 
-static void test_case_wdog_03(FAR void **state)
+static void drivertest_watchdog_loop(FAR void **state)
 {
   int ret;
   static struct wdog_s wdog;
@@ -427,13 +427,13 @@ static void test_case_wdog_03(FAR void **state)
 }
 
 /****************************************************************************
- * Name: test_case_wdog_04
+ * Name: drivertest_watchdog_api
  *
  * Description:
  *   This function is used to test the watchdog driver interface.
  ****************************************************************************/
 
-static void test_case_wdog_04(FAR void **state)
+static void drivertest_watchdog_api(FAR void **state)
 {
   int dev_fd;
   int ret;
@@ -540,10 +540,10 @@ int main(int argc, FAR char *argv[])
 
   const struct CMUnitTest tests[] =
   {
-    cmocka_unit_test_prestate(test_case_wdog_01, &wdg_state),
-    cmocka_unit_test_prestate(test_case_wdog_02, &wdg_state),
-    cmocka_unit_test_prestate(test_case_wdog_03, &wdg_state),
-    cmocka_unit_test_prestate(test_case_wdog_04, &wdg_state)
+    cmocka_unit_test_prestate(drivertest_watchdog_feeding, &wdg_state),
+    cmocka_unit_test_prestate(drivertest_watchdog_interrupts, &wdg_state),
+    cmocka_unit_test_prestate(drivertest_watchdog_loop, &wdg_state),
+    cmocka_unit_test_prestate(drivertest_watchdog_api, &wdg_state)
   };
 
   return cmocka_run_group_tests(tests, NULL, NULL);

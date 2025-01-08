@@ -196,7 +196,7 @@ static int test_regulator_resume(FAR struct regulator_dev_s *rdev)
   return 0;
 }
 
-static void test_regulator_register(FAR void **state)
+static void drivertest_reg_register(FAR void **state)
 {
   FAR struct regulator_dev_s *test = NULL;
 
@@ -211,7 +211,7 @@ static void test_regulator_register(FAR void **state)
   regulator_unregister(g_fake_regulator.rdev);
 }
 
-static void test_regulator_always_on(FAR void **state)
+static void drivertest_reg_always_on(FAR void **state)
 {
   FAR struct regulator_s *test = NULL;
   int ret = 0;
@@ -252,7 +252,7 @@ static void test_regulator_always_on(FAR void **state)
   return;
 }
 
-static void test_regulator_supply_1(FAR void **state)
+static void drivertest_reg_supply_always_on_boot_off(FAR void **state)
 {
   FAR struct regulator_s *test = NULL;
   int cnt = 10;
@@ -311,7 +311,7 @@ static void test_regulator_supply_1(FAR void **state)
   return;
 }
 
-static void test_regulator_supply_2(FAR void **state)
+static void drivertest_reg_supply_boot_on_always_on(FAR void **state)
 {
   FAR struct regulator_s *test = NULL;
   int cnt = 10;
@@ -370,7 +370,7 @@ static void test_regulator_supply_2(FAR void **state)
   return;
 }
 
-static void test_regulator_supply_3(FAR void **state)
+static void drivertest_reg_supply_boot_on_always_off(FAR void **state)
 {
   FAR struct regulator_s *test = NULL;
   int cnt = 10;
@@ -433,7 +433,7 @@ static void test_regulator_supply_3(FAR void **state)
   return;
 }
 
-static void test_regulator_supply_4(FAR void **state)
+static void drivertest_reg_supply_boot_off_always_off(FAR void **state)
 {
   FAR struct regulator_s *test = NULL;
   int cnt = 10;
@@ -493,7 +493,7 @@ static void test_regulator_supply_4(FAR void **state)
   return;
 }
 
-static void test_regulator_mode(FAR void **state)
+static void drivertest_reg_mode(FAR void **state)
 {
   FAR struct regulator_s *test = NULL;
   int cnt = 10;
@@ -533,7 +533,7 @@ static void test_regulator_mode(FAR void **state)
 }
 
 #ifdef CONFIG_PM
-static void test_regulator_pm_register(FAR void **state)
+static void drivertest_reg_pm_register(FAR void **state)
 {
   g_fake_regulator_desc.auto_lp = 0;
   g_fake_regulator.lpmode = REGULATOR_MODE_INVALID;
@@ -554,7 +554,7 @@ static void test_regulator_pm_register(FAR void **state)
   return;
 }
 
-static void test_regulator_pm_callback(FAR void **state)
+static void drivertest_reg_pm_callback(FAR void **state)
 {
   g_fake_regulator_desc.supply_name = NULL;
   g_fake_regulator_desc.auto_lp = 1;
@@ -609,16 +609,20 @@ int main(int argc, FAR char *argv[])
 {
   const struct CMUnitTest tests[] =
     {
-      cmocka_unit_test_prestate(test_regulator_register, NULL),
-      cmocka_unit_test_prestate(test_regulator_always_on, NULL),
-      cmocka_unit_test_prestate(test_regulator_supply_1, NULL),
-      cmocka_unit_test_prestate(test_regulator_supply_2, NULL),
-      cmocka_unit_test_prestate(test_regulator_supply_3, NULL),
-      cmocka_unit_test_prestate(test_regulator_supply_4, NULL),
-      cmocka_unit_test_prestate(test_regulator_mode, NULL),
+      cmocka_unit_test_prestate(drivertest_reg_register, NULL),
+      cmocka_unit_test_prestate(drivertest_reg_always_on, NULL),
+      cmocka_unit_test_prestate(drivertest_reg_supply_always_on_boot_off,
+                                NULL),
+      cmocka_unit_test_prestate(drivertest_reg_supply_boot_on_always_on,
+                                NULL),
+      cmocka_unit_test_prestate(drivertest_reg_supply_boot_on_always_off,
+                                NULL),
+      cmocka_unit_test_prestate(drivertest_reg_supply_boot_off_always_off,
+                                NULL),
+      cmocka_unit_test_prestate(drivertest_reg_mode, NULL),
 #ifdef CONFIG_PM
-      cmocka_unit_test_prestate(test_regulator_pm_register, NULL),
-      cmocka_unit_test_prestate(test_regulator_pm_callback, NULL),
+      cmocka_unit_test_prestate(drivertest_reg_pm_register, NULL),
+      cmocka_unit_test_prestate(drivertest_reg_pm_callback, NULL),
 #endif
     };
 

@@ -123,10 +123,10 @@ static int setup(FAR void **state)
 }
 
 /****************************************************************************
- * Name: relaytest01
+ * Name: drivertest_relay
  ****************************************************************************/
 
-static void relaytest01(FAR void **state)
+static void drivertest_relay(FAR void **state)
 {
   FAR struct relay_args_s *relay_args;
   int fd;
@@ -241,7 +241,7 @@ int main(int argc, FAR char *argv[])
   parse_commandline(argc, argv, &relay_args);
   const struct CMUnitTest tests[] =
     {
-      cmocka_unit_test_prestate_setup_teardown(relaytest01, setup,
+      cmocka_unit_test_prestate_setup_teardown(drivertest_relay, setup,
                                                teardown, &relay_args),
     };
 

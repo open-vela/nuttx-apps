@@ -224,10 +224,10 @@ static int setup_driver(FAR void **state)
 }
 
 /****************************************************************************
- * Name: blktest_stress
+ * Name: drivertest_block_stress
  ****************************************************************************/
 
-static void blktest_stress(FAR void **state)
+static void drivertest_block_stress(FAR void **state)
 {
   FAR struct pre_build_s *pre;
   FAR void *input;
@@ -285,10 +285,10 @@ static void blktest_stress(FAR void **state)
 }
 
 /****************************************************************************
- * Name: blktest_multiple_write
+ * Name: drivertest_block_cache_write
  ****************************************************************************/
 
-static void blktest_cachesize_write(FAR void **state)
+static void drivertest_block_cache_write(FAR void **state)
 {
   FAR struct pre_build_s *pre;
   FAR void *input;
@@ -385,10 +385,10 @@ static void blktest_cachesize_write(FAR void **state)
 }
 
 /****************************************************************************
- * Name: blktest_single_write
+ * Name: drivertest_block_single_write
  ****************************************************************************/
 
-static void blktest_single_write(FAR void **state)
+static void drivertest_block_single_write(FAR void **state)
 {
   FAR struct pre_build_s *pre;
   FAR void *input;
@@ -488,12 +488,12 @@ int main(int argc, FAR char *argv[])
   parse_commandline(argc, argv, pre);
   const struct CMUnitTest tests[] =
     {
-      cmocka_unit_test_prestate_setup_teardown(blktest_stress, setup_bch,
-                                               teardown_bch, pre),
-      cmocka_unit_test_prestate_setup_teardown(blktest_single_write,
+      cmocka_unit_test_prestate_setup_teardown(drivertest_block_stress,
+                                               setup_bch, teardown_bch, pre),
+      cmocka_unit_test_prestate_setup_teardown(drivertest_block_single_write,
                                                setup_driver, teardown_driver,
                                                pre),
-      cmocka_unit_test_prestate_setup_teardown(blktest_cachesize_write,
+      cmocka_unit_test_prestate_setup_teardown(drivertest_block_cache_write,
                                                setup_driver, teardown_driver,
                                                pre),
     };
