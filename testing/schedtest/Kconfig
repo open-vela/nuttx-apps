@@ -6,6 +6,7 @@
 config TESTING_SCHEDTEST
 	tristate "Sched test"
 	default n
+	depends on WQUEUE_NOTIFIER
 	---help---
 		Enable the Sched test
 
