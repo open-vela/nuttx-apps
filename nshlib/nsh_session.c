@@ -207,7 +207,7 @@ int nsh_session(FAR struct console_stdio_s *pstate,
        * occurs. Either  will cause the session to terminate.
        */
 
-      ret = cle_fd(pstate->cn_line, nsh_prompt(), CONFIG_NSH_LINELEN,
+      ret = cle_fd(pstate->cn_line, nsh_prompt(), LINE_MAX,
                    INFD(pstate), OUTFD(pstate));
       if (ret == EOF)
         {
@@ -226,7 +226,7 @@ int nsh_session(FAR struct console_stdio_s *pstate,
        * will cause the session to terminate.
        */
 
-      ret = readline_fd(pstate->cn_line, CONFIG_NSH_LINELEN,
+      ret = readline_fd(pstate->cn_line, LINE_MAX,
                         INFD(pstate), OUTFD(pstate));
       if (ret == EOF)
         {
