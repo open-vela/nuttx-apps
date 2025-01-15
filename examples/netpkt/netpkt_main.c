@@ -27,6 +27,8 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <netinet/if_ether.h>
+#include <netinet/in.h>
 #include <netpacket/packet.h>
 
 /****************************************************************************
@@ -54,6 +56,7 @@ static int psock_create(void)
 
   addr.sll_family = AF_PACKET;
   addr.sll_ifindex = 0;
+  addr.sll_protocol = htons(ETH_P_ALL);
   if (bind(sd, (const struct sockaddr *)&addr, addrlen) < 0)
     {
       perror("ERROR: binding socket failed");
