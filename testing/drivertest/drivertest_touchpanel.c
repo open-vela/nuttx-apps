@@ -642,9 +642,10 @@ void touchpad_deinit(touchpad_s *touchpad)
       touchpad->indev = NULL;
     }
 
-  if (touchpad->fd > 0)
+  if (touchpad->fd >= 0)
     {
       close(touchpad->fd);
+      touchpad->fd = -1;
     }
 
   free(touchpad);
