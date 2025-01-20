@@ -222,8 +222,8 @@ static int critmon_process_directory(FAR struct dirent *entryp)
 
 #if CONFIG_SCHED_CRITMONITOR_MAXTIME_PREEMPTION >= 0
   maxpreemp = pos;
-  pos = strchr(pos, ',');
-  if (pos != NULL)
+  pos = strchrnul(pos, ',');
+  if (*pos != '\0')
     {
       *pos++ = '\0';
     }
@@ -233,8 +233,8 @@ static int critmon_process_directory(FAR struct dirent *entryp)
 
 #if CONFIG_SCHED_CRITMONITOR_MAXTIME_CSECTION >= 0
   maxcrit = pos;
-  pos = strchr(pos, ',');
-  if (pos != NULL)
+  pos = strchrnul(pos, ',');
+  if (*pos != '\0')
     {
       *pos++ = '\0';
     }
@@ -244,15 +244,15 @@ static int critmon_process_directory(FAR struct dirent *entryp)
 
 #if CONFIG_SCHED_CRITMONITOR_MAXTIME_THREAD >= 0
   maxrun = pos;
-  pos = strchr(pos, ',');
-  if (pos != NULL)
+  pos = strchrnul(pos, ',');
+  if (*pos != '\0')
     {
       *pos++ = '\0';
     }
 
   runtime = pos;
-  pos = strchr(pos, ',');
-  if (pos != NULL)
+  pos = strchrnul(pos, ',');
+  if (*pos != '\0')
     {
       *pos++ = '\0';
     }
@@ -362,16 +362,16 @@ static void critmon_global_crit(void)
 
       pos = critmon_isolate_value(g_critmon.line);
       cpu = pos;
-      pos = strchr(pos, ',');
-      if (pos != NULL)
+      pos = strchrnul(pos, ',');
+      if (*pos != '\0')
         {
           *pos++ = '\0';
         }
 
 #if CONFIG_SCHED_CRITMONITOR_MAXTIME_PREEMPTION >= 0
       maxpreemp = pos;
-      pos = strchr(pos, ',');
-      if (pos != NULL)
+      pos = strchrnul(pos, ',');
+      if (*pos != '\0')
         {
           *pos++ = '\0';
         }
@@ -381,8 +381,8 @@ static void critmon_global_crit(void)
 
 #if CONFIG_SCHED_CRITMONITOR_MAXTIME_CSECTION >= 0
       maxcrit = pos;
-      pos = strchr(pos, ',');
-      if (pos != NULL)
+      pos = strchrnul(pos, ',');
+      if (*pos != '\0')
         {
           *pos++ = '\0';
         }
