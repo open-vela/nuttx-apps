@@ -135,6 +135,18 @@ if(CONFIG_INTERPRETERS_QUICKJS)
     list(APPEND QUICKJS_CSRCS ${QUICKJS_DIR}/quickjs-libc.c)
   endif()
 
+  if(CONFIG_INTERPRETERS_QUICKJS_TEST)
+    add_custom_target(
+      qjstest_img
+      COMMAND genromfs -f ${CMAKE_BINARY_DIR}/etc/qjstest.img -d
+              ${QUICKJS_DIR}/tests -V "ROMFS_Test"
+      WORKING_DIRECTORY ${QUICKJS_DIR}
+      COMMENT "QUICKJS UNIT TEST Generating qjstest.img...")
+
+    add_dynamic_rcraws(RAWS ${CMAKE_BINARY_DIR}/etc/qjstest.img DEPENDS
+                       qjstest_img)
+  endif()
+
   nuttx_add_library(libqjs)
   target_sources(libqjs PRIVATE ${QUICKJS_CSRCS})
   target_include_directories(libqjs PRIVATE ${QUICKJS_INCDIR})

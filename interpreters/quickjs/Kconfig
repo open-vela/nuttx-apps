@@ -72,4 +72,8 @@ config INTERPRETERS_QUICKJS_CPUPROFILING
 	bool "Enable QUICKJS_CPUPROFILING"
 	default n
 
+config INTERPRETERS_QUICKJS_TEST
+	bool "Enable QuickJS test"
+	default n
+
 endif # INTERPRETERS_QUICKJS
