@@ -65,6 +65,10 @@ else
   WABITYPE = $(LLVM_ABITYPE)
 endif
 
+ifeq ($(CONFIG_INTERPRETERS_WAMR_GC),y)
+  RCFLAGS += --enable-gc
+endif
+
 RCFLAGS += --target=$(WTARGET) --target-abi=$(WABITYPE) --cpu=$(WCPU)
 
 define WAMR_AOT_COMPILE
