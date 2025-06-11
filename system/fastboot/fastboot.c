@@ -23,6 +23,7 @@
  ****************************************************************************/
 
 #include <nuttx/config.h>
+#include <nuttx/memoryregion.h>
 #include <nuttx/mtd/mtd.h>
 #include <nuttx/version.h>
 
@@ -154,6 +155,8 @@ struct fastboot_cmd_s
                       FAR const char *arg);
 };
 
+typedef void (*memdump_print_t)(FAR void *, FAR char *);
+
 /****************************************************************************
  * Private Function Prototypes
  ****************************************************************************/
@@ -208,6 +211,13 @@ static const struct fastboot_cmd_s g_oem_cmd[] =
   { "shell",              fastboot_shell            },
 #endif
 };
+
+#ifdef CONFIG_BOARD_MEMORY_RANGE
+static const struct memory_region_s g_memory_region[] =
+{
+  CONFIG_BOARD_MEMORY_RANGE
+};
+#endif
 
 /****************************************************************************
  * Private Functions
@@ -648,6 +658,37 @@ static int fastboot_memdump_upload(FAR struct fastboot_ctx_s *context)
                         context->upload_param.size);
 }
 
+static void fastboot_memdump_region(memdump_print_t memprint, FAR void *priv)
+{
+#ifdef CONFIG_BOARD_MEMORY_RANGE
+  char response[FASTBOOT_MSG_LEN - 4];
+  size_t index;
+
+  for (index = 0; index < nitems(g_memory_region); index++)
+    {
+      snprintf(response, sizeof(response),
+               "fastboot oem memdump 0x%" PRIxPTR " 0x%" PRIxPTR "\n",
+               g_memory_region[index].start,
+               g_memory_region[index].end - g_memory_region[index].start);
+      memprint(priv, response);
+      snprintf(response, sizeof(response),
+               "fastboot get_staged 0x%" PRIxPTR ".bin\n",
+               g_memory_region[index].start);
+      memprint(priv, response);
+    }
+#endif
+}
+
+static void fastboot_memdump_syslog(FAR void *priv, FAR char *response)
+{
+  fb_err("    %s", response);
+}
+
+static void fastboot_memdump_response(FAR void *priv, FAR char *response)
+{
+  fastboot_ack((FAR struct fastboot_ctx_s *)priv, "TEXT", response);
+}
+
 /* Usage(host):
  *   fastboot oem memdump <addr> <size>
  *
@@ -664,6 +705,7 @@ static void fastboot_memdump(FAR struct fastboot_ctx_s *context,
              &context->upload_param.u.mem.addr,
              &context->upload_param.size) != 2)
     {
+      fastboot_memdump_region(fastboot_memdump_response, context);
       fastboot_fail(context, "Invalid argument");
       return;
     }
@@ -1042,6 +1084,8 @@ int main(int argc, FAR char **argv)
       if (strcmp(argv[1], "-h") == 0)
         {
           fb_err("Usage: fastbootd [wait_ms]\n");
+          fb_err("\nmemdump: \n");
+          fastboot_memdump_region(fastboot_memdump_syslog, NULL);
           return 0;
         }
 
