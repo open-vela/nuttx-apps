@@ -155,7 +155,7 @@ struct fastboot_cmd_s
                       FAR const char *arg);
 };
 
-typedef void (*memdump_print_t)(FAR void *, FAR char *);
+typedef void (*memdump_print_t)(FAR void *, FAR const char *);
 
 /****************************************************************************
  * Private Function Prototypes
@@ -679,12 +679,13 @@ static void fastboot_memdump_region(memdump_print_t memprint, FAR void *priv)
 #endif
 }
 
-static void fastboot_memdump_syslog(FAR void *priv, FAR char *response)
+static void fastboot_memdump_syslog(FAR void *priv, FAR const char *response)
 {
   fb_err("    %s", response);
 }
 
-static void fastboot_memdump_response(FAR void *priv, FAR char *response)
+static void fastboot_memdump_response(FAR void *priv,
+                                      FAR const char *response)
 {
   fastboot_ack((FAR struct fastboot_ctx_s *)priv, "TEXT", response);
 }
