@@ -1,5 +1,5 @@
 ############################################################################
-# apps/examples/hello_rust/Make.defs
+# apps/examples/rust/hello/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,6 +18,19 @@
 #
 ############################################################################
 
-ifneq ($(CONFIG_EXAMPLES_HELLO_RUST),)
-CONFIGURED_APPS += $(APPDIR)/examples/hello_rust
-endif
+include $(APPDIR)/Make.defs
+
+# Hello, Rust! built-in application info
+
+PROGNAME  = $(CONFIG_EXAMPLES_HELLO_RUST_CARGO_PROGNAME)
+PRIORITY  = $(CONFIG_EXAMPLES_HELLO_RUST_CARGO_PRIORITY)
+STACKSIZE = $(CONFIG_EXAMPLES_HELLO_RUST_CARGO_STACKSIZE)
+MODULE    = $(CONFIG_EXAMPLES_HELLO_RUST_CARGO)
+
+context::
+	$(call RUST_CARGO_BUILD,hello,$(APPDIR)/examples/rust)
+
+clean::
+	$(call RUST_CARGO_CLEAN,hello,$(APPDIR)/examples/rust)
+
+include $(APPDIR)/Application.mk

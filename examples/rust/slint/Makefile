@@ -1,5 +1,5 @@
 ############################################################################
-# apps/examples/hello_rust/Makefile
+# apps/examples/rust/slint/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -20,17 +20,15 @@
 
 include $(APPDIR)/Make.defs
 
-# Hello, Rust! built-in application info
+PROGNAME  = $(CONFIG_EXAMPLES_RUST_SLINT_PROGNAME)
+PRIORITY  = $(CONFIG_EXAMPLES_RUST_SLINT_PRIORITY)
+STACKSIZE = $(CONFIG_EXAMPLES_RUST_SLINT_STACKSIZE)
+MODULE    = $(CONFIG_EXAMPLES_RUST_SLINT)
 
-PROGNAME  = $(CONFIG_EXAMPLES_HELLO_RUST_PROGNAME)
-PRIORITY  = $(CONFIG_EXAMPLES_HELLO_RUST_PRIORITY)
-STACKSIZE = $(CONFIG_EXAMPLES_HELLO_RUST_STACKSIZE)
-MODULE    = $(CONFIG_EXAMPLES_HELLO_RUST)
+context::
+	$(call RUST_CARGO_BUILD,slint,$(APPDIR)/examples/rust)
 
-# Hello, Rust! Example
-
-MAINSRC = hello_rust_main.rs
-
-RUSTFLAGS += -C panic=abort -O
+clean::
+	$(call RUST_CARGO_CLEAN,slint,$(APPDIR)/examples/rust)
 
 include $(APPDIR)/Application.mk
