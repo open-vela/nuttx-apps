@@ -1,0 +1,30 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+menuconfig EXAMPLES_HOURGLASS
+	tristate "HOURGLASS Demo"
+	default n
+	depends on GRAPHICS_LVGL
+	---help---
+		Enable build the Light and Versatile Graphics Library Demo programs
+
+if EXAMPLES_HOURGLASS
+
+config EXAMPLES_HOURGLASS_PRIORITY
+	int "hourglass task priority"
+	default 100
+
+config EXAMPLES_HOURGLASS_STACKSIZE
+	int "hourglass stack size"
+	default 16384
+
+config EXAMPLES_HOURGLASS_INPUT_DEVPATH
+	string "Touchscreen device path"
+	default "/dev/input0"
+	depends on INPUT_TOUCHSCREEN
+	---help---
+		The path to the touchscreen device. Default: "/dev/input0"
+
+endif # EXAMPLES_HOURGLASS
