@@ -26,6 +26,7 @@
 
 #include <ctype.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -239,54 +240,26 @@ out:
   return ret;
 }
 
-int init_parse_configs(FAR const struct parser_s *parser,
-                       FAR const char *path)
+int init_parse_configs(FAR const struct parser_s *parser)
 {
-  FAR struct dirent *entry;
+  static FAR const char *base = "/etc/init.d/init.";
   char file[PATH_MAX];
-  struct stat sb;
-  FAR DIR *dir;
-  int ret = 0;
-  size_t i;
+  int ret;
 
-  if (stat(path, &sb) < 0)
+  snprintf(file, sizeof(file), "%src", base);
+  ret = init_parse_config_file(parser, file);
+  if (ret < 0)
     {
-      init_err("stat %s", path);
-      return -errno;
+      return ret;
     }
 
-  if (S_ISDIR(sb.st_mode))
+  snprintf(file, sizeof(file), "%scpu%d.rc", base, sched_getcpu());
+  ret = access(file, F_OK);
+  if (ret < 0)
     {
-      dir = opendir(path);
-      if (dir == NULL)
-        {
-          init_err("opening directory %s", path);
-          return -errno;
-        }
-
-      while ((entry = readdir(dir)) != NULL)
-        {
-          if (DIRENT_ISFILE(entry->d_type))
-            {
-              i = strlen(entry->d_name);
-              if (i >= 3 && !strcmp(entry->d_name + i - 3, ".rc"))
-                {
-                  snprintf(file, sizeof(file), "%s/%s", path, entry->d_name);
-                  ret = init_parse_config_file(parser, file);
-                  if (ret < 0)
-                    {
-                      break;
-                    }
-                }
-            }
-        }
-
-      closedir(dir);
-    }
-  else if (S_ISREG(sb.st_mode))
-    {
-      ret = init_parse_config_file(parser, path);
+      init_debug("skipping non-exist file %s", file);
+      return 0;
     }
 
-  return ret;
+  return init_parse_config_file(parser, file);
 }
