@@ -1,0 +1,26 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_CAMTEST
+	tristate "Camera capture test"
+	default n
+	---help---
+		Simple camera capture test for ESP32-S3 LCD_CAM driver.
+
+if EXAMPLES_CAMTEST
+
+config EXAMPLES_CAMTEST_PROGNAME
+	string "Program name"
+	default "camtest"
+
+config EXAMPLES_CAMTEST_PRIORITY
+	int "Task priority"
+	default 100
+
+config EXAMPLES_CAMTEST_STACKSIZE
+	int "Stack size"
+	default 4096
+
+endif
