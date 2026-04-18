@@ -1655,7 +1655,7 @@ static int ftpd_changedir(FAR struct ftpd_session_s *session,
                      (FAR char **)(&workpath));
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ',
                     "Can not change directory !");
       return ret;
@@ -1781,7 +1781,7 @@ static int ftpd_stream(FAR struct ftpd_session_s *session, int cmdtype)
   ret = ftpd_getpath(session, session->param, &abspath, NULL);
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ', "Stream error !");
       goto errout;
     }
@@ -1846,8 +1846,7 @@ static int ftpd_stream(FAR struct ftpd_session_s *session, int cmdtype)
 
   if (session->fd < 0)
     {
-      ret = -errno;
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ', "Can not open file !");
       goto errout_with_data;
     }
@@ -1898,9 +1897,8 @@ static int ftpd_stream(FAR struct ftpd_session_s *session, int cmdtype)
 
       if (seekoffs < 0)
         {
-          ftpd_response(session->cmd.sd, session->txtimeout,
+          ret = ftpd_response(session->cmd.sd, session->txtimeout,
                         g_respfmt1, 550, ' ', "Can not seek file !");
-          ret = -errval;
           goto errout_with_session;
         }
     }
@@ -1962,9 +1960,8 @@ static int ftpd_stream(FAR struct ftpd_session_s *session, int cmdtype)
         {
           nerr("ERROR: Read failed: rdbytes=%zu errval=%d\n",
                rdbytes, errval);
-          ftpd_response(session->cmd.sd, session->txtimeout,
+          ret = ftpd_response(session->cmd.sd, session->txtimeout,
                         g_respfmt1, 550, ' ', "Data read error !");
-          ret = -errval;
           break;
         }
 
@@ -2060,9 +2057,8 @@ static int ftpd_stream(FAR struct ftpd_session_s *session, int cmdtype)
         {
           nerr("ERROR: Write failed: wrbytes=%zu errval=%d\n",
                wrbytes, errval);
-          ftpd_response(session->cmd.sd, session->txtimeout,
+          ret = ftpd_response(session->cmd.sd, session->txtimeout,
                         g_respfmt1, 550, ' ', "Data send error !");
-          ret = -errval;
           break;
         }
     }
@@ -3009,9 +3005,9 @@ static int ftpd_command_rmd(FAR struct ftpd_session_s *session)
   ret = ftpd_getpath(session, session->param, &abspath, &workpath);
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ',
-                    "Can not remove directory !");
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ',
+                          "Can not remove directory !");
       return ret;
     }
 
@@ -3020,10 +3016,10 @@ static int ftpd_command_rmd(FAR struct ftpd_session_s *session)
       free(abspath);
       free(workpath);
 
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ',
-                    "Can not remove home directory !");
-      return -EINVAL;
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ',
+                          "Can not remove home directory !");
+      return ret;
     }
 
   if (strcmp(session->work, workpath) == 0)
@@ -3031,22 +3027,21 @@ static int ftpd_command_rmd(FAR struct ftpd_session_s *session)
       free(abspath);
       free(workpath);
 
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ',
-                    "Can not remove current directory !");
-      return -EINVAL;
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ',
+                          "Can not remove current directory !");
+      return ret;
     }
 
   ret = rmdir(abspath);
   if (ret < 0)
     {
-      ret = -errno;
       free(abspath);
       free(workpath);
 
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ',
-                    "Can not remove directory !");
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ',
+                          "Can not remove directory !");
       return ret;
     }
 
@@ -3070,9 +3065,9 @@ static int ftpd_command_mkd(FAR struct ftpd_session_s *session)
   ret = ftpd_getpath(session, session->param, &abspath, NULL);
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ',
-                    "Can not make directory !");
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ',
+                          "Can not make directory !");
       return ret;
     }
 
@@ -3080,9 +3075,8 @@ static int ftpd_command_mkd(FAR struct ftpd_session_s *session)
                        S_IXGRP | S_IROTH | S_IXOTH);
   if (ret < 0)
     {
-      ret = -errno;
       free(abspath);
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ', "Can not make directory !");
       return ret;
     }
@@ -3105,8 +3099,8 @@ static int ftpd_command_dele(FAR struct ftpd_session_s *session)
   ret = ftpd_getpath(session, session->param, &abspath, &workpath);
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ', "Can not delete file !");
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ', "Can not delete file !");
       return ret;
     }
 
@@ -3115,10 +3109,10 @@ static int ftpd_command_dele(FAR struct ftpd_session_s *session)
       free(abspath);
       free(workpath);
 
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ',
-                    "Can not delete home directory !");
-      return -EINVAL;
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ',
+                          "Can not delete home directory !");
+      return ret;
     }
 
   if (strcmp(session->work, workpath) == 0)
@@ -3126,21 +3120,20 @@ static int ftpd_command_dele(FAR struct ftpd_session_s *session)
       free(abspath);
       free(workpath);
 
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ',
-                    "Can not delete current directory !");
-      return -EINVAL;
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ',
+                          "Can not delete current directory !");
+      return ret;
     }
 
   ret = unlink(abspath);
   if (ret < 0)
     {
-      ret = -errno;
       free(abspath);
       free(workpath);
 
-      ftpd_response(session->cmd.sd, session->txtimeout,
-                    g_respfmt1, 550, ' ', "Can not delete file !");
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
+                          g_respfmt1, 550, ' ', "Can not delete file !");
       return ret;
     }
 
@@ -3512,7 +3505,7 @@ static int ftpd_command_size(FAR struct ftpd_session_s *session)
   ret = ftpd_getpath(session, session->param, &abspath, NULL);
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ', "Unknown size !");
       return ret;
     }
@@ -3553,16 +3546,14 @@ static int ftpd_command_size(FAR struct ftpd_session_s *session)
         status = stat(path, &st);
         if (status < 0)
           {
-            ret = -errno;
-            ftpd_response(session->cmd.sd, session->txtimeout,
+            ret = ftpd_response(session->cmd.sd, session->txtimeout,
                           g_respfmt2, 550, ' ', session->param,
                           ": not a regular file.");
             goto errout_with_abspath;
           }
         else if (!S_ISREG(st.st_mode))
           {
-            ret = -EPERM;
-            ftpd_response(session->cmd.sd, session->txtimeout,
+            ret = ftpd_response(session->cmd.sd, session->txtimeout,
                           g_respfmt2, 550, ' ', session->param,
                           ": not a regular file.");
             goto errout_with_abspath;
@@ -3571,8 +3562,7 @@ static int ftpd_command_size(FAR struct ftpd_session_s *session)
         outstream = fopen(path, "r");
         if (outstream == NULL)
           {
-            ret = -errno;
-            ftpd_response(session->cmd.sd, session->txtimeout,
+            ret = ftpd_response(session->cmd.sd, session->txtimeout,
                           g_respfmt2, 550, ' ', session->param,
                           ": Can not open file !");
             goto errout_with_abspath;
@@ -3645,7 +3635,7 @@ static int ftpd_command_rnfr(FAR struct ftpd_session_s *session)
   ret = ftpd_getpath(session, session->param, &abspath, NULL);
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ', "RNFR error !");
       return ret;
     }
@@ -3677,15 +3667,15 @@ static int ftpd_command_rnto(FAR struct ftpd_session_s *session)
 
   if (session->renamefrom == NULL)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ', "RNTO error !");
-      return -EINVAL;
+      return ret;
     }
 
   ret = ftpd_getpath(session, session->param, &abspath, NULL);
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ', "RNTO error !");
       return ret;
     }
@@ -3693,9 +3683,8 @@ static int ftpd_command_rnto(FAR struct ftpd_session_s *session)
   ret = rename(session->renamefrom, abspath);
   if (ret < 0)
     {
-      ret = -errno;
       free(abspath);
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt2, 550, ' ', session->param,
                     ": Rename error.");
       return ret;
@@ -3765,7 +3754,7 @@ static int ftpd_command_mdtm(FAR struct ftpd_session_s *session)
   ret = ftpd_getpath(session, session->param, &abspath, NULL);
   if (ret < 0)
     {
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt1, 550, ' ', "Unknown size !");
       return ret;
     }
@@ -3775,9 +3764,8 @@ static int ftpd_command_mdtm(FAR struct ftpd_session_s *session)
   ret = stat(path, &st);
   if (ret < 0)
     {
-      ret = -errno;
       free(abspath);
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt2, 550, ' ', session->param,
                     ": not a plain file.");
       return ret;
@@ -3786,10 +3774,10 @@ static int ftpd_command_mdtm(FAR struct ftpd_session_s *session)
   if (!S_ISREG(st.st_mode))
     {
       free(abspath);
-      ftpd_response(session->cmd.sd, session->txtimeout,
+      ret = ftpd_response(session->cmd.sd, session->txtimeout,
                     g_respfmt2, 550, ' ', session->param,
                     ": not a plain file.");
-      return -EISDIR;
+      return ret;
     }
 
   free(abspath);
