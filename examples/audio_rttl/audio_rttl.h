@@ -18,5 +18,11 @@
  *
  ****************************************************************************/
 
-FAR char *g_song = (FAR char *)
-  "Test:d=4,o=6,b=90:c,c#,d,d#,e,f,f#,g,a,a#,b,p,b,a#,a,g,f#,f,e,d#,d,c#,c";
+#ifndef __APPS_EXAMPLES_AUDIO_RTTL_AUDIO_RTTL_H
+#define __APPS_EXAMPLES_AUDIO_RTTL_AUDIO_RTTL_H
+
+#include <nuttx/compiler.h>
+
+extern FAR char *g_song;
+
+#endif /* __APPS_EXAMPLES_AUDIO_RTTL_AUDIO_RTTL_H */
