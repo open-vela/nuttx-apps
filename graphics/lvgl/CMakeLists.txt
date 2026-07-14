@@ -68,6 +68,47 @@ if(CONFIG_GRAPHICS_LVGL)
     "${LVGL_DIR}/src/*.cpp"
     "${LVGL_DIR}/demos/*.c"
     "${LVGL_DIR}/examples/*.c")
+
+  # GLOB_RECURSE above blindly pulls every source file under src/, including
+  # hardware-accelerated draw backends and arch-specific asm that only build on
+  # specific platforms. Filter them out when the corresponding Kconfig option is
+  # not set, so unrelated targets don't try to compile them.
+
+  # blend/neon/*.S is ARMv7 (AArch32) inline asm and only assembles under an ARM
+  # 32-bit / M-profile / R-profile toolchain.
+  if(NOT CONFIG_ARCH_ARMV7A
+     AND NOT CONFIG_ARCH_ARMV7M
+     AND NOT CONFIG_ARCH_ARMV8M
+     AND NOT CONFIG_ARCH_ARMV7R
+     AND NOT CONFIG_ARCH_ARMV8R)
+    list(FILTER SRCS EXCLUDE REGEX "/blend/neon/.*\\.S$")
+  endif()
+
+  # Allwinner G2D backend; needs g2d_driver.h and hal_cache.h from the Allwinner
+  # BSP, absent on non-Allwinner targets.
+  if(NOT CONFIG_LV_USE_DRAW_G2D)
+    list(FILTER SRCS EXCLUDE REGEX "/draw/sunxi_g2d/.*\\.(c|cpp)$")
+  endif()
+
+  # VeriSilicon VG-Lite backend.
+  if(NOT CONFIG_LV_USE_DRAW_VG_LITE)
+    list(FILTER SRCS EXCLUDE REGEX "/draw/vg_lite/.*\\.(c|cpp)$")
+    list(FILTER SRCS EXCLUDE REGEX
+         "/draw/vg_lite_vector_optimize/.*\\.(c|cpp)$")
+  endif()
+
+  # NXP i.MX RT VG-Lite / PXP backends.
+  if(NOT CONFIG_LV_USE_DRAW_VGLITE)
+    list(FILTER SRCS EXCLUDE REGEX "/draw/nxp/vglite/.*\\.(c|cpp)$")
+    list(FILTER SRCS EXCLUDE REGEX "/draw/nxp/pxp/.*\\.(c|cpp)$")
+  endif()
+
+  # ArtInChip GE2D/MPP backend; needs mpp_ge.h from vendor/artinchip BSP, absent
+  # on non-ArtInChip targets.
+  if(NOT CONFIG_LV_USE_DRAW_GE2D AND NOT CONFIG_LV_USE_MPP_DEC)
+    list(FILTER SRCS EXCLUDE REGEX "/draw/artinchip/.*\\.(c|cpp)$")
+  endif()
+
   nuttx_add_library(lvgl)
 
   target_sources(lvgl PRIVATE ${SRCS})
