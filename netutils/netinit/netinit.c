@@ -970,6 +970,123 @@ errout:
 #endif
 
 /****************************************************************************
+ * Name: netinit_clear_ipv4
+ *
+ * Description:
+ *   Remove active IPv4 configuration after carrier loss without changing
+ *   the administrative interface state.
+ *
+ ****************************************************************************/
+
+#if defined(CONFIG_NETINIT_CARRIER_POLL) && defined(CONFIG_NET_IPv4)
+static void netinit_clear_ipv4(void)
+{
+  struct in_addr addr;
+
+  addr.s_addr = INADDR_ANY;
+  netlib_set_dripv4addr(NET_DEVNAME, &addr);
+  netlib_set_ipv4netmask(NET_DEVNAME, &addr);
+  netlib_set_ipv4addr(NET_DEVNAME, &addr);
+}
+
+/****************************************************************************
+ * Name: netinit_carrier_monitor
+ *
+ * Description:
+ *   Follow driver-published carrier edges while preserving IFF_UP.
+ *
+ ****************************************************************************/
+
+static int netinit_carrier_monitor(void)
+{
+  struct in_addr addr;
+  struct ifreq ifr;
+  unsigned int retry_msec = 0;
+  bool last_running = false;
+  bool initialized = false;
+  bool running;
+  int ret;
+  int sd;
+
+  sd = socket(NET_SOCK_FAMILY, NET_SOCK_TYPE, NET_SOCK_PROTOCOL);
+  if (sd < 0)
+    {
+      ret = -errno;
+      nerr("ERROR: Failed to create carrier monitor socket: %d\n", ret);
+      return ret;
+    }
+
+  for (; ; )
+    {
+      memset(&ifr, 0, sizeof(ifr));
+      strlcpy(ifr.ifr_name, NET_DEVNAME, IFNAMSIZ);
+      ret = ioctl(sd, SIOCGIFFLAGS, (unsigned long)&ifr);
+      if (ret < 0)
+        {
+          nerr("ERROR: Failed to read interface flags: %d\n", errno);
+          goto wait;
+        }
+
+      running = (ifr.ifr_flags & IFF_RUNNING) != 0;
+      if (!initialized || running != last_running)
+        {
+          ninfo("%s carrier %s\n", NET_DEVNAME,
+                running ? "up" : "down");
+
+          if (!running)
+            {
+              netinit_clear_ipv4();
+              retry_msec = 0;
+            }
+#ifdef CONFIG_NETUTILS_DHCPC
+          else if (g_use_dhcpc)
+            {
+              addr.s_addr = INADDR_ANY;
+              netlib_get_ipv4addr(NET_DEVNAME, &addr);
+              if (addr.s_addr == INADDR_ANY &&
+                  netlib_obtain_ipv4addr(NET_DEVNAME) < 0)
+                {
+                  retry_msec = CONFIG_NETINIT_DHCP_RETRYMSEC;
+                }
+            }
+#endif
+
+          last_running = running;
+          initialized = true;
+        }
+#ifdef CONFIG_NETUTILS_DHCPC
+      else if (running && g_use_dhcpc)
+        {
+          addr.s_addr = INADDR_ANY;
+          netlib_get_ipv4addr(NET_DEVNAME, &addr);
+          if (addr.s_addr == INADDR_ANY)
+            {
+              if (retry_msec <= CONFIG_NETINIT_CARRIER_POLL_MSEC)
+                {
+                  if (netlib_obtain_ipv4addr(NET_DEVNAME) < 0)
+                    {
+                      retry_msec = CONFIG_NETINIT_DHCP_RETRYMSEC;
+                    }
+                }
+              else
+                {
+                  retry_msec -= CONFIG_NETINIT_CARRIER_POLL_MSEC;
+                }
+            }
+          else
+            {
+              retry_msec = 0;
+            }
+        }
+#endif
+
+wait:
+      usleep(CONFIG_NETINIT_CARRIER_POLL_MSEC * 1000);
+    }
+}
+#endif
+
+/****************************************************************************
  * Name: netinit_thread
  *
  * Description:
@@ -990,6 +1107,12 @@ static pthread_addr_t netinit_thread(pthread_addr_t arg)
   /* Monitor the network status */
 
   netinit_monitor();
+#endif
+
+#ifdef CONFIG_NETINIT_CARRIER_POLL
+  /* Monitor driver-published carrier state without changing IFF_UP. */
+
+  netinit_carrier_monitor();
 #endif
 
   ninfo("Exit\n");
