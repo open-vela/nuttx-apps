@@ -137,23 +137,38 @@ ifneq ($(strip $(PROGNAME)),)
         $(if $(word $i,$(HEAPSIZE)),$(word $i,$(HEAPSIZE)),$(lastword $(HEAPSIZE)))) \
   )
 
+  # When LTO is enabled, LD is set to the compiler driver (e.g.
+  # arm-none-eabi-gcc) which does not understand the bare --defsym option.
+  # Detect whether LD is a gcc driver and prefix accordingly so that the
+  # flag is correctly forwarded to the underlying linker via -Wl,.
+  # Both ld and gcc accept the --defsym=symbol=value form; gcc needs the
+  # -Wl, prefix, bare ld does not. Multiple flags are separated by += ,
+  # which inserts a space for ld; for gcc we use a trailing comma instead.
+  ifneq ($(findstring gcc,$(notdir $(LD))),)
+    DEFSYM_FLAG = -Wl,--defsym=
+  else
+    DEFSYM_FLAG = --defsym=
+  endif
+
   ifneq ($(PRIORITY_$(REGLIST)), SCHED_PRIORITY_DEFAULT)
     ifneq ($(PRIORITY_$(REGLIST)),)
-     MODLDFLAGS += --defsym nx_priority=$(PRIORITY_$(REGLIST))
+     MODLDFLAGS += $(DEFSYM_FLAG)nx_priority=$(PRIORITY_$(REGLIST))
     endif
   endif
 
   ifneq ($(STACKSIZE_$(REGLIST)),)
-    MODLDFLAGS += --defsym nx_stacksize=$(STACKSIZE_$(REGLIST))
+    MODLDFLAGS += $(DEFSYM_FLAG)nx_stacksize=$(STACKSIZE_$(REGLIST))
   endif
 
   ifeq ($(CONFIG_SCHED_USER_IDENTITY),y)
-    MODLDFLAGS += --defsym nx_uid=$(UID_$(REGLIST)) --defsym nx_gid=$(GID_$(REGLIST)) --defsym nx_mod=$(GID_$(REGLIST))
+    MODLDFLAGS += $(DEFSYM_FLAG)nx_uid=$(UID_$(REGLIST))
+    MODLDFLAGS += $(DEFSYM_FLAG)nx_gid=$(GID_$(REGLIST))
+    MODLDFLAGS += $(DEFSYM_FLAG)nx_mod=$(GID_$(REGLIST))
   endif
 
   ifeq ($(CONFIG_MM_TASK_HEAP),y)
     ifneq ($(HEAPSIZE_$(REGLIST)),)
-      MODLDFLAGS += --defsym nx_heapsize=$(HEAPSIZE_$(REGLIST))
+      MODLDFLAGS += $(DEFSYM_FLAG)nx_heapsize=$(HEAPSIZE_$(REGLIST))
     endif
   endif
 endif
