@@ -47,6 +47,8 @@ extern int bk7258_psram_width(void);
 
 extern int bk7258_psram_heap_init(void);
 extern void *bk7258_psram_malloc(size_t size);
+extern void *bk7258_psram_memalign(size_t alignment,
+                                    size_t size);
 extern void bk7258_psram_free(void *ptr);
 extern void bk7258_psram_meminfo(struct mallinfo *info);
 
@@ -62,27 +64,31 @@ static void    *g_allocs[PSRAM_MAX_ALLOCS];
 static size_t   g_alloc_sizes[PSRAM_MAX_ALLOCS];
 static int      g_nallocs;
 
-/* Temporary buffer for SRAM verification */
-
-static char g_sram_verify[16];
-
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
 
 int main(int argc, FAR char *argv[])
 {
+  int ret;
+  clock_t t_wr;
+  clock_t t_rd;
+  uint32_t wr_kb;
+  uint32_t rd_kb;
+
   if (argc < 2)
     {
       printf("usage: psram <command>\n");
       printf("  id              read chip ID and size\n");
-      printf("  probe           init + ID + single-word data test\n");
+      printf("  probe           init + ID + single-word test\n");
       printf("  test [mb]       address-in-address test "
              "(destructive)\n");
       printf("  alias           address alias detection\n");
-      printf("  width           8/16/32-bit access width test\n");
+      printf("  width           8/16/32-bit access test\n");
       printf("  heap            show PSRAM heap status\n");
       printf("  alloc <KB>      alloc from PSRAM heap\n");
+      printf("  align <A> <KB>  memalign alloc (A=32/64)\n");
+      printf("  fbtest          camera framebuffer test\n");
       printf("  freeall         free all alloc'd blocks\n");
       return -EINVAL;
     }
@@ -153,6 +159,7 @@ int main(int argc, FAR char *argv[])
     {
       size_t kb;
       void *ptr;
+      void *sram;
       volatile uint8_t *p;
       int ret;
       int i;
@@ -223,14 +230,170 @@ int main(int argc, FAR char *argv[])
       printf("alloc: %zu KB @ %p (OK, slot %d)\n",
              kb, ptr, g_nallocs - 1);
 
-      /* Prove that static data lives in SRAM, not PSRAM */
+      /* Prove that ordinary malloc still returns SRAM */
 
-      printf("  verify: static @ %p "
-             "(SRAM %s)\n",
-             g_sram_verify,
-             ((uintptr_t)g_sram_verify >= 0x28000000 &&
-              (uintptr_t)g_sram_verify < 0x29000000)
-             ? "OK" : "UNEXPECTED");
+      sram = malloc(1024);
+      if (sram != NULL)
+        {
+          printf("  verify: malloc(1024)=%p %s\n",
+                 sram,
+                 ((uintptr_t)sram >= 0x60000000 &&
+                  (uintptr_t)sram < 0x61000000)
+                 ? "POLLUTED!" : "(SRAM OK)");
+          free(sram);
+        }
+    }
+  else if (strcmp(argv[1], "align") == 0)
+    {
+      size_t align;
+      size_t kb;
+      void *ptr;
+      int ret;
+
+      if (argc < 4)
+        {
+          printf("usage: psram align <alignment> <KB>\n");
+          return -EINVAL;
+        }
+
+      ret = bk7258_psram_heap_init();
+      if (ret < 0)
+        {
+          return ret;
+        }
+
+      if (g_nallocs >= PSRAM_MAX_ALLOCS)
+        {
+          printf("align: slot full, run freeall first\n");
+          return -ENOMEM;
+        }
+
+      align = (size_t)strtoul(argv[2], NULL, 0);
+      kb = (size_t)strtoul(argv[3], NULL, 0);
+      ptr = bk7258_psram_memalign(align, kb * 1024);
+      if (ptr == NULL)
+        {
+          printf("align: memalign(%zu, %zu KB) failed\n",
+                 align, kb);
+          return -ENOMEM;
+        }
+
+      printf("align: %zu KB @ %p (align %zu, "
+             "mod=%zu)\n",
+             kb, ptr, align,
+             (size_t)((uintptr_t)ptr % align));
+
+      if ((uintptr_t)ptr % align != 0)
+        {
+          printf("  ERROR: alignment not met!\n");
+          bk7258_psram_free(ptr);
+          return -EIO;
+        }
+
+      g_allocs[g_nallocs] = ptr;
+      g_alloc_sizes[g_nallocs] = kb * 1024;
+      g_nallocs++;
+    }
+  else if (strcmp(argv[1], "fbtest") == 0)
+    {
+      /* Camera framebuffer validation: alloc 614 KB at
+       * 32 and 64 byte alignment, verify, read/write test,
+       * measure bandwidth, free all.
+       */
+
+      size_t fb_kb = 614;
+      int a;
+
+      ret = bk7258_psram_heap_init();
+      if (ret < 0)
+        {
+          return ret;
+        }
+
+      printf("fbtest: camera buffer %zu KB\n", fb_kb);
+
+      for (a = 0; a < 2; a++)
+        {
+          size_t al = (a == 0) ? 32 : 64;
+          void *p;
+          volatile uint8_t *v;
+          clock_t t0;
+          size_t i;
+          size_t nbytes = fb_kb * 1024;
+
+          if (g_nallocs >= PSRAM_MAX_ALLOCS)
+            {
+              printf("  slot full, run freeall\n");
+              return -ENOMEM;
+            }
+
+          p = bk7258_psram_memalign(al, nbytes);
+          if (p == NULL)
+            {
+              printf("  align %zu: alloc FAILED\n", al);
+              return -ENOMEM;
+            }
+
+          printf("  align %zu: %p (mod=%zu) ",
+                 al, p, (size_t)((uintptr_t)p % al));
+
+          if ((uintptr_t)p % al != 0)
+            {
+              printf("FAIL\n");
+              bk7258_psram_free(p);
+              return -EIO;
+            }
+
+          g_allocs[g_nallocs] = p;
+          g_alloc_sizes[g_nallocs] = nbytes;
+          g_nallocs++;
+
+          /* Write pattern */
+
+          v = (volatile uint8_t *)p;
+          t0 = clock_systime_ticks();
+          for (i = 0; i < nbytes; i++)
+            {
+              v[i] = (uint8_t)(i & 0xff);
+            }
+
+          t_wr = clock_systime_ticks() - t0;
+
+          /* Read verify */
+
+          t0 = clock_systime_ticks();
+          for (i = 0; i < nbytes; i++)
+            {
+              if (v[i] != (uint8_t)(i & 0xff))
+                {
+                  printf("FAIL @ +%zu\n", i);
+                  return -EIO;
+                }
+            }
+
+          t_rd = clock_systime_ticks() - t0;
+
+          if (t_wr > 0)
+            {
+              wr_kb = (uint32_t)((uint64_t)nbytes *
+                       1000 / (uint64_t)t_wr / 1024);
+            }
+
+          if (t_rd > 0)
+            {
+              rd_kb = (uint32_t)((uint64_t)nbytes *
+                       1000 / (uint64_t)t_rd / 1024);
+            }
+
+          printf("OK, %lu.%lu / %lu.%lu KB/s (wr/rd)\n",
+                 (unsigned long)(wr_kb / 10),
+                 (unsigned long)(wr_kb % 10),
+                 (unsigned long)(rd_kb / 10),
+                 (unsigned long)(rd_kb % 10));
+        }
+
+      printf("fbtest: all passed, %d blocks allocated\n",
+             g_nallocs);
     }
   else if (strcmp(argv[1], "freeall") == 0)
     {
