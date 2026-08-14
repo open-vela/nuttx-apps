@@ -1,0 +1,31 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_PSRAM
+	tristate "BK7258 PSRAM probe command"
+	default n
+	depends on BK7258_PSRAM
+	---help---
+		NSH command "psram" for BK7258 PSRAM bring-up verification.
+		Sub-commands: id (read chip ID), probe (init + ID + data path
+		test).
+
+if EXAMPLES_PSRAM
+
+config EXAMPLES_PSRAM_PROGNAME
+	string "Program name"
+	default "psram"
+	---help---
+		NSH command name.
+
+config EXAMPLES_PSRAM_PRIORITY
+	int "Task priority"
+	default 100
+
+config EXAMPLES_PSRAM_STACKSIZE
+	int "Stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+endif
