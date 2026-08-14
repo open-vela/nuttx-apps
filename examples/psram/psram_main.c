@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /****************************************************************************
  * External Functions
@@ -65,16 +66,61 @@ static size_t   g_alloc_sizes[PSRAM_MAX_ALLOCS];
 static int      g_nallocs;
 
 /****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: elapsed_us
+ *
+ * Description:
+ *   Microseconds between two CLOCK_MONOTONIC samples.
+ *
+ *   We deliberately use clock_gettime() rather than the OS-internal
+ *   clock_systime_ticks(): the latter is documented as "should not be
+ *   called from application code", and a raw tick delta silently bakes
+ *   in the CONFIG_USEC_PER_TICK value (10 ms here), which is far too
+ *   coarse to be trusted for these measurements.
+ *
+ ****************************************************************************/
+
+static uint32_t elapsed_us(FAR const struct timespec *a,
+                           FAR const struct timespec *b)
+{
+  int64_t us;
+
+  us = (int64_t)(b->tv_sec - a->tv_sec) * 1000000LL +
+       ((int64_t)b->tv_nsec - (int64_t)a->tv_nsec) / 1000LL;
+
+  return (us > 0) ? (uint32_t)us : 0;
+}
+
+/****************************************************************************
+ * Name: kbps_x10
+ *
+ * Description:
+ *   Throughput in KB/s scaled by 10 (i.e. one decimal place).
+ *   Returns 0 if the interval is too short to measure.
+ *
+ ****************************************************************************/
+
+static uint32_t kbps_x10(size_t nbytes, uint32_t us)
+{
+  if (us == 0)
+    {
+      return 0;
+    }
+
+  return (uint32_t)((uint64_t)nbytes * 10 * 1000000ull /
+                    (uint64_t)us / 1024ull);
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
 int main(int argc, FAR char *argv[])
 {
   int ret;
-  clock_t t_wr;
-  clock_t t_rd;
-  uint32_t wr_kb;
-  uint32_t rd_kb;
 
   if (argc < 2)
     {
@@ -95,14 +141,15 @@ int main(int argc, FAR char *argv[])
 
   if (strcmp(argv[1], "id") == 0)
     {
-      int ret = bk7258_psram_init();
+      ret = bk7258_psram_init();
 
       if (ret < 0)
         {
           return ret;
         }
 
-      printf("psram: chip ID = 0x%04x\n", bk7258_psram_get_id());
+      printf("psram: chip ID = 0x%04lx\n",
+             (unsigned long)bk7258_psram_get_id());
       printf("psram: size    = %lu KB (%lu MB)\n",
              (unsigned long)(bk7258_psram_get_size() / 1024),
              (unsigned long)(bk7258_psram_get_size() /
@@ -134,7 +181,6 @@ int main(int argc, FAR char *argv[])
   else if (strcmp(argv[1], "heap") == 0)
     {
       struct mallinfo info;
-      int ret;
 
       ret = bk7258_psram_heap_init();
       if (ret < 0)
@@ -161,7 +207,6 @@ int main(int argc, FAR char *argv[])
       void *ptr;
       void *sram;
       volatile uint8_t *p;
-      int ret;
       int i;
 
       if (argc < 3)
@@ -248,7 +293,6 @@ int main(int argc, FAR char *argv[])
       size_t align;
       size_t kb;
       void *ptr;
-      int ret;
 
       if (argc < 4)
         {
@@ -270,6 +314,25 @@ int main(int argc, FAR char *argv[])
 
       align = (size_t)strtoul(argv[2], NULL, 0);
       kb = (size_t)strtoul(argv[3], NULL, 0);
+
+      /* Validate before use: the mod checks below would divide by
+       * zero on align == 0, and a non-power-of-two alignment can
+       * never be satisfied.
+       */
+
+      if (align == 0 || (align & (align - 1)) != 0)
+        {
+          printf("align: alignment must be a non-zero power "
+                 "of two (got %zu)\n", align);
+          return -EINVAL;
+        }
+
+      if (kb == 0)
+        {
+          printf("align: size must be >= 1 KB\n");
+          return -EINVAL;
+        }
+
       ptr = bk7258_psram_memalign(align, kb * 1024);
       if (ptr == NULL)
         {
@@ -317,7 +380,12 @@ int main(int argc, FAR char *argv[])
           size_t al = (a == 0) ? 32 : 64;
           void *p;
           volatile uint8_t *v;
-          clock_t t0;
+          struct timespec t0;
+          struct timespec t1;
+          uint32_t wr_us;
+          uint32_t rd_us;
+          uint32_t wr_x10;
+          uint32_t rd_x10;
           size_t i;
           size_t nbytes = fb_kb * 1024;
 
@@ -351,17 +419,18 @@ int main(int argc, FAR char *argv[])
           /* Write pattern */
 
           v = (volatile uint8_t *)p;
-          t0 = clock_systime_ticks();
+          clock_gettime(CLOCK_MONOTONIC, &t0);
           for (i = 0; i < nbytes; i++)
             {
               v[i] = (uint8_t)(i & 0xff);
             }
 
-          t_wr = clock_systime_ticks() - t0;
+          clock_gettime(CLOCK_MONOTONIC, &t1);
+          wr_us = elapsed_us(&t0, &t1);
 
           /* Read verify */
 
-          t0 = clock_systime_ticks();
+          clock_gettime(CLOCK_MONOTONIC, &t0);
           for (i = 0; i < nbytes; i++)
             {
               if (v[i] != (uint8_t)(i & 0xff))
@@ -371,25 +440,22 @@ int main(int argc, FAR char *argv[])
                 }
             }
 
-          t_rd = clock_systime_ticks() - t0;
+          clock_gettime(CLOCK_MONOTONIC, &t1);
+          rd_us = elapsed_us(&t0, &t1);
 
-          if (t_wr > 0)
-            {
-              wr_kb = (uint32_t)((uint64_t)nbytes *
-                       1000 / (uint64_t)t_wr / 1024);
-            }
+          /* Throughput in KB/s x10 (one decimal place). */
 
-          if (t_rd > 0)
-            {
-              rd_kb = (uint32_t)((uint64_t)nbytes *
-                       1000 / (uint64_t)t_rd / 1024);
-            }
+          wr_x10 = kbps_x10(nbytes, wr_us);
+          rd_x10 = kbps_x10(nbytes, rd_us);
 
-          printf("OK, %lu.%lu / %lu.%lu KB/s (wr/rd)\n",
-                 (unsigned long)(wr_kb / 10),
-                 (unsigned long)(wr_kb % 10),
-                 (unsigned long)(rd_kb / 10),
-                 (unsigned long)(rd_kb % 10));
+          printf("OK, %lu.%lu / %lu.%lu KB/s (wr/rd), "
+                 "%lu / %lu ms\n",
+                 (unsigned long)(wr_x10 / 10),
+                 (unsigned long)(wr_x10 % 10),
+                 (unsigned long)(rd_x10 / 10),
+                 (unsigned long)(rd_x10 % 10),
+                 (unsigned long)(wr_us / 1000),
+                 (unsigned long)(rd_us / 1000));
         }
 
       printf("fbtest: all passed, %d blocks allocated\n",
