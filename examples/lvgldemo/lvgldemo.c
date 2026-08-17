@@ -24,6 +24,7 @@
 
 #include <nuttx/config.h>
 #include <unistd.h>
+#include <syslog.h>
 #include <sys/boardctl.h>
 
 #include <lvgl/lvgl.h>
@@ -31,6 +32,19 @@
 #ifdef CONFIG_LV_USE_NUTTX_LIBUV
 #include <uv.h>
 #endif
+
+/****************************************************************************
+ * Public Data
+ ****************************************************************************/
+
+/* Incremented once per main-loop iteration (>= 10 Hz while healthy, the
+ * idle sleep is capped at 100 ms below).  A board-level watchdog thread
+ * reads this to detect the loop sleeping in a usleep() whose wakeup was
+ * lost, and kicks the thread with a signal (the sleep ends with EINTR
+ * and the loop runs clean from then on).
+ */
+
+volatile uint32_t g_lvgl_heartbeat;
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -143,7 +157,20 @@ int main(int argc, FAR char *argv[])
   info.input_path = CONFIG_EXAMPLES_LVGLDEMO_INPUT_DEVPATH;
 #endif
 
+  /* The touchscreen must open here, before the demo starts, and its
+   * polling must then run without long gaps: the GT911 only stays
+   * write-accessible when the host begins talking to it shortly after
+   * its reset and keeps polling.  A deferred first open (~1.5 s after
+   * boot) reproducibly found the controller NACKing every
+   * write-direction transfer for the rest of the session.
+   */
+
   lv_nuttx_init(&info, &result);
+
+  if (result.indev != NULL && result.disp != NULL)
+    {
+      lv_indev_set_display(result.indev, result.disp);
+    }
 
   if (result.disp == NULL)
     {
@@ -166,7 +193,23 @@ int main(int argc, FAR char *argv[])
   while (1)
     {
       uint32_t idle;
+
       idle = lv_timer_handler();
+
+      g_lvgl_heartbeat++;
+
+      /* lv_timer_handler() returns LV_NO_TIMER_READY (0xFFFFFFFF) when
+       * every timer is momentarily paused (the v9 refr timer pauses
+       * itself after each run).  usleep(idle * 1000) then overflows into
+       * a ~71 minute sleep and the UI freezes on whatever was on screen
+       * (observed as the blue boot fill after a warm RST).  Cap the
+       * sleep so a bogus idle costs 100 ms, not an apparent hang.
+       */
+
+      if (idle > 100)
+        {
+          idle = 100;
+        }
 
       /* Minimum sleep of 1ms */
 
