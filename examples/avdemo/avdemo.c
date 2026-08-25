@@ -122,6 +122,14 @@ struct avdemo_aud_s
 
 static struct avdemo_cam_s g_cam;
 static struct avdemo_aud_s g_aud;
+
+/* When true (Wi-Fi panel open) the camera keeps streaming - buffers
+ * are still drained and requeued so the capture pipeline never
+ * starves - but the on-screen image is not updated: a full-screen
+ * 15 fps repaint under the panel makes the whole UI unusably slow.
+ */
+
+static bool g_cam_ui_paused;
 static lv_obj_t *g_chart;
 static lv_chart_series_t *g_series;
 static lv_obj_t *g_status;
@@ -335,7 +343,7 @@ static void avdemo_cam_timer_cb(FAR lv_timer_t *timer)
         }
     }
 
-  if (!got)
+  if (!got || g_cam_ui_paused)
     {
       return;
     }
@@ -769,6 +777,15 @@ static void avdemo_wifi_close_cb(FAR lv_event_t *e)
 {
   (void)e;
   lv_obj_add_flag(g_wifi_panel, LV_OBJ_FLAG_HIDDEN);
+
+  /* Resume the camera view */
+
+  g_cam_ui_paused = false;
+  if (g_cam.img != NULL && g_cam.streaming)
+    {
+      lv_obj_remove_flag(g_cam.img, LV_OBJ_FLAG_HIDDEN);
+      lv_obj_invalidate(g_cam.img);
+    }
 }
 
 static void avdemo_wifi_timer_cb(FAR lv_timer_t *timer)
@@ -816,6 +833,17 @@ static void avdemo_wifi_open_cb(FAR lv_event_t *e)
   FAR lv_obj_t *lbl;
 
   (void)e;
+
+  /* Pause the camera view: a full-screen 15 fps repaint underneath
+   * makes the panel unusably laggy.  Streaming continues (buffers
+   * keep cycling), only the display update stops.
+   */
+
+  g_cam_ui_paused = true;
+  if (g_cam.img != NULL)
+    {
+      lv_obj_add_flag(g_cam.img, LV_OBJ_FLAG_HIDDEN);
+    }
 
   if (g_wifi_panel != NULL)
     {
