@@ -194,6 +194,22 @@ int main(int argc, FAR char *argv[])
     {
       uint32_t idle;
 
+      /* The v9 refresh timer pauses itself after each run and relies on
+       * the next invalidation to resume it; that resume has been seen
+       * to go missing mid-session (UI frozen, every other timer alive).
+       * Forcing it back on costs nothing when it is already running.
+       */
+
+      if (result.disp != NULL)
+        {
+          lv_timer_t *refr = lv_display_get_refr_timer(result.disp);
+
+          if (refr != NULL)
+            {
+              lv_timer_resume(refr);
+            }
+        }
+
       idle = lv_timer_handler();
 
       g_lvgl_heartbeat++;

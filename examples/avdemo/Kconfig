@@ -1,0 +1,38 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+menuconfig EXAMPLES_AVDEMO
+	tristate "Camera + microphone LVGL demo (avdemo)"
+	default n
+	depends on GRAPHICS_LVGL
+	---help---
+		LVGL demo showing a live MIPI-CSI camera view with a microphone
+		waveform overlay.  Expects /dev/video0 (RGB565 capture) and
+		/dev/audio/pcm_in0 (PCM capture); each is optional at runtime.
+
+if EXAMPLES_AVDEMO
+
+config EXAMPLES_AVDEMO_PRIORITY
+	int "avdemo task priority"
+	default 100
+
+config EXAMPLES_AVDEMO_STACKSIZE
+	int "avdemo stack size"
+	default 32768
+
+config EXAMPLES_AVDEMO_INPUT_DEVPATH
+	string "Touchscreen device path"
+	default "/dev/input0"
+	depends on INPUT_TOUCHSCREEN
+
+config EXAMPLES_AVDEMO_VIDEO_DEVPATH
+	string "Video capture device path"
+	default "/dev/video0"
+
+config EXAMPLES_AVDEMO_AUDIO_DEVPATH
+	string "Audio capture device path"
+	default "/dev/audio/pcm_in0"
+
+endif # EXAMPLES_AVDEMO
