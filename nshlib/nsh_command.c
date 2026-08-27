@@ -27,6 +27,9 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#ifdef CONFIG_NSH_BUILTIN_AS_COMMAND
+#  include <nuttx/lib/builtin.h>
+#endif
 
 #ifdef CONFIG_NSH_BUILTIN_APPS
 #  include <nuttx/lib/builtin.h>
@@ -1269,7 +1272,7 @@ int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
 
   index = builtin_isavail(cmd);
 
-  if (index > 0)
+  if (index >= 0)
     {
       /* Get the builtin structure by index */
 
