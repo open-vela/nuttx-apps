@@ -35,6 +35,7 @@
 
 #include <arpa/inet.h>
 #include <debug.h>
+#include <errno.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -68,6 +69,10 @@
 #endif
 
 #include "netutils/netinit.h"
+
+#ifdef CONFIG_NETDB_DNSCLIENT
+#  include <nuttx/net/dns.h>
+#endif
 
 #ifdef CONFIG_NETUTILS_NETINIT
 
@@ -224,6 +229,36 @@ static sem_t g_notify_sem;
 bool g_use_dhcpc;
 #endif
 
+#if defined(CONFIG_NET_IPv4) && defined(NETINIT_HAVE_NETDEV)
+/* Desired IPv4 policy.  g_use_dhcpc remains the DHCP enable flag used by the
+ * existing bring-up and carrier paths; static fields apply when it is false.
+ */
+
+static pthread_mutex_t g_ipv4_policy_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct netinit_ipv4_config g_ipv4_policy =
+{
+  .mode = NETINIT_IPV4_DHCP,
+  .address =
+    {
+      .s_addr = INADDR_ANY
+    },
+  .netmask =
+    {
+      .s_addr = INADDR_ANY
+    },
+  .router =
+    {
+      .s_addr = INADDR_ANY
+    },
+  .dns =
+    {
+      .s_addr = INADDR_ANY
+    }
+};
+static bool g_ipv4_policy_valid = false;
+static unsigned int g_ipv4_policy_generation;
+#endif
+
 #if defined(CONFIG_NET_IPv6) && !defined(CONFIG_NET_ICMPv6_AUTOCONF) && \
    !defined(CONFIG_NET_6LOWPAN)
 /* Host IPv6 address */
@@ -374,6 +409,27 @@ static inline void netinit_checkpath(void)
 #endif
 
 /****************************************************************************
+ * Private Function Prototypes
+ ****************************************************************************/
+
+#if defined(CONFIG_NET_IPv4) && defined(NETINIT_HAVE_NETDEV)
+static void netinit_clear_dns(void);
+static int netinit_replace_dns(FAR const struct in_addr *dns);
+#ifdef CONFIG_NETINIT_CARRIER_POLL
+static void netinit_clear_ipv4(void);
+static void netinit_reapply_policy_locked(bool have_carrier);
+#endif
+static void netinit_seed_boot_policy_locked(bool use_dhcp);
+static int netinit_bringup_ipv4_policy(void);
+static int netinit_apply_static_locked(
+  FAR const struct netinit_ipv4_config *config);
+static int netinit_apply_dhcp_locked(bool have_carrier);
+#ifdef CONFIG_NETUTILS_DHCPC
+static int netinit_obtain_ipv4addr(unsigned int generation);
+#endif
+#endif
+
+/****************************************************************************
  * Name: netinit_set_ipv4addrs
  *
  * Description:
@@ -410,8 +466,26 @@ static inline void netinit_set_ipv4addrs(void)
 #ifdef CONFIG_NETUTILS_DHCPC
       if (IPCFG_USE_DHCP(ipv4cfg.proto))
         {
-          g_use_dhcpc = true;
-          addr.s_addr = 0;
+          pthread_mutex_lock(&g_ipv4_policy_lock);
+          if (!g_ipv4_policy_valid ||
+              g_ipv4_policy.mode == NETINIT_IPV4_DHCP)
+            {
+              g_use_dhcpc = true;
+              netinit_seed_boot_policy_locked(true);
+              addr.s_addr = 0;
+            }
+          else
+            {
+              /* Runtime static policy already owns the interface. */
+
+              struct netinit_ipv4_config local = g_ipv4_policy;
+
+              netinit_apply_static_locked(&local);
+              pthread_mutex_unlock(&g_ipv4_policy_lock);
+              return;
+            }
+
+          pthread_mutex_unlock(&g_ipv4_policy_lock);
         }
       else
 #endif
@@ -504,14 +578,49 @@ static inline void netinit_set_ipv4addrs(void)
   else
 #endif
     {
-      /* Set up our host address */
+      /* Set up our host address.  If a runtime policy was already installed
+       * (for example by VelaGuard before boot DHCP), honor that owner and
+       * skip conflicting defaults.
+       */
+
+      pthread_mutex_lock(&g_ipv4_policy_lock);
+      if (g_ipv4_policy_valid)
+        {
+          bool use_dhcp = (g_ipv4_policy.mode == NETINIT_IPV4_DHCP);
+          struct netinit_ipv4_config local = g_ipv4_policy;
+
+#ifdef CONFIG_NETUTILS_DHCPC
+          g_use_dhcpc = use_dhcp;
+#endif
+          if (!use_dhcp)
+            {
+              netinit_apply_static_locked(&local);
+              pthread_mutex_unlock(&g_ipv4_policy_lock);
+              return;
+            }
+
+          addr.s_addr = 0;
+          netlib_set_ipv4addr(NET_DEVNAME, &addr);
+          netlib_set_dripv4addr(NET_DEVNAME, &addr);
+          netlib_set_ipv4netmask(NET_DEVNAME, &addr);
+          netinit_clear_dns();
+          pthread_mutex_unlock(&g_ipv4_policy_lock);
+          return;
+        }
 
 #ifdef CONFIG_NETINIT_DHCPC
       g_use_dhcpc = true;
+      netinit_seed_boot_policy_locked(true);
       addr.s_addr = 0;
 #else
+#ifdef CONFIG_NETUTILS_DHCPC
+      g_use_dhcpc = false;
+#endif
+      netinit_seed_boot_policy_locked(false);
       addr.s_addr = HTONL(CONFIG_NETINIT_IPADDR);
 #endif
+      pthread_mutex_unlock(&g_ipv4_policy_lock);
+
       netlib_set_ipv4addr(NET_DEVNAME, &addr);
 
       /* Set up the default router address */
@@ -526,7 +635,7 @@ static inline void netinit_set_ipv4addrs(void)
 
 #ifdef CONFIG_NETINIT_DNS
       addr.s_addr = HTONL(CONFIG_NETINIT_DNSIPADDR);
-      netlib_set_ipv4dnsaddr(&addr);
+      netinit_replace_dns(&addr);
 #endif
     }
 }
@@ -657,12 +766,9 @@ static void netinit_net_bringup(void)
 #endif
 
 #ifdef CONFIG_NETUTILS_DHCPC
-  if (g_use_dhcpc)
+  if (netinit_bringup_ipv4_policy() < 0)
     {
-      if (netlib_obtain_ipv4addr(NET_DEVNAME) < 0)
-        {
-          return;
-        }
+      return;
     }
 #endif
 
@@ -969,6 +1075,472 @@ errout:
 }
 #endif
 
+#if defined(CONFIG_NET_IPv4) && defined(NETINIT_HAVE_NETDEV)
+/****************************************************************************
+ * Name: netinit_clear_dns
+ *
+ * Description:
+ *   Drop active resolver entries so mode switches do not leave stale DNS.
+ *
+ ****************************************************************************/
+
+static void netinit_clear_dns(void)
+{
+#ifdef CONFIG_NETDB_DNSCLIENT
+  dns_default_nameserver();
+#endif
+}
+
+/****************************************************************************
+ * Name: netinit_replace_dns
+ *
+ * Description:
+ *   Replace the resolver set with zero or one preferred DNS address.
+ *
+ ****************************************************************************/
+
+static int netinit_replace_dns(FAR const struct in_addr *dns)
+{
+#ifdef CONFIG_NETDB_DNSCLIENT
+  int ret;
+
+  netinit_clear_dns();
+  if (dns == NULL || dns->s_addr == INADDR_ANY)
+    {
+      return OK;
+    }
+
+  ret = netlib_set_ipv4dnsaddr(dns);
+  return ret;
+#else
+  UNUSED(dns);
+  return OK;
+#endif
+}
+
+#ifdef CONFIG_NETINIT_CARRIER_POLL
+/****************************************************************************
+ * Name: netinit_clear_ipv4
+ *
+ * Description:
+ *   Remove active IPv4 configuration after carrier loss without changing
+ *   the administrative interface state.  Desired policy is retained.
+ *
+ ****************************************************************************/
+
+static void netinit_clear_ipv4(void)
+{
+  struct in_addr addr;
+
+  addr.s_addr = INADDR_ANY;
+  netlib_set_dripv4addr(NET_DEVNAME, &addr);
+  netlib_set_ipv4netmask(NET_DEVNAME, &addr);
+  netlib_set_ipv4addr(NET_DEVNAME, &addr);
+  netinit_clear_dns();
+}
+
+/****************************************************************************
+ * Name: netinit_reapply_policy_locked
+ *
+ * Description:
+ *   Replay the retained IPv4 policy after carrier recovery.
+ *
+ ****************************************************************************/
+
+static void netinit_reapply_policy_locked(bool have_carrier)
+{
+  if (!g_ipv4_policy_valid)
+    {
+#ifdef CONFIG_NETUTILS_DHCPC
+      if (have_carrier && g_use_dhcpc)
+        {
+          struct in_addr addr;
+
+          addr.s_addr = INADDR_ANY;
+          netlib_get_ipv4addr(NET_DEVNAME, &addr);
+          if (addr.s_addr == INADDR_ANY)
+            {
+              netlib_obtain_ipv4addr(NET_DEVNAME);
+            }
+        }
+
+#endif
+
+      return;
+    }
+
+  if (g_ipv4_policy.mode == NETINIT_IPV4_STATIC)
+    {
+      if (have_carrier)
+        {
+          netinit_apply_static_locked(&g_ipv4_policy);
+        }
+    }
+  else
+    {
+      netinit_apply_dhcp_locked(have_carrier);
+#ifdef CONFIG_NETUTILS_DHCPC
+      if (have_carrier)
+        {
+          struct in_addr addr;
+
+          addr.s_addr = INADDR_ANY;
+          netlib_get_ipv4addr(NET_DEVNAME, &addr);
+          if (addr.s_addr == INADDR_ANY)
+            {
+              netlib_obtain_ipv4addr(NET_DEVNAME);
+            }
+        }
+
+#endif
+    }
+}
+#endif /* CONFIG_NETINIT_CARRIER_POLL */
+
+/****************************************************************************
+ * Name: netinit_seed_boot_policy_locked
+ *
+ * Description:
+ *   Capture the boot-time DHCP/static choice into the shared policy so later
+ *   carrier recovery and runtime setters share one owner.
+ *   Caller holds the policy lock.
+ *
+ ****************************************************************************/
+
+static void netinit_seed_boot_policy_locked(bool use_dhcp)
+{
+  if (g_ipv4_policy_valid)
+    {
+      return;
+    }
+
+  memset(&g_ipv4_policy, 0, sizeof(g_ipv4_policy));
+  if (use_dhcp)
+    {
+      g_ipv4_policy.mode = NETINIT_IPV4_DHCP;
+    }
+  else
+    {
+      g_ipv4_policy.mode = NETINIT_IPV4_STATIC;
+    }
+
+  g_ipv4_policy_valid = true;
+  g_ipv4_policy_generation++;
+}
+
+/****************************************************************************
+ * Name: netinit_obtain_ipv4addr
+ *
+ * Description:
+ *   Obtain a DHCP lease without holding the policy lock.  If a runtime
+ *   setter installs a static policy while DHCP is in flight, restore that
+ *   newer policy after the old lease has finished updating the interface.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_NETUTILS_DHCPC
+static int netinit_obtain_ipv4addr(unsigned int generation)
+{
+  int ret;
+
+  ret = netlib_obtain_ipv4addr(NET_DEVNAME);
+
+  pthread_mutex_lock(&g_ipv4_policy_lock);
+  if (generation != g_ipv4_policy_generation &&
+      g_ipv4_policy_valid &&
+      g_ipv4_policy.mode == NETINIT_IPV4_STATIC)
+    {
+      ret = netinit_apply_static_locked(&g_ipv4_policy);
+    }
+
+  pthread_mutex_unlock(&g_ipv4_policy_lock);
+  return ret;
+}
+#endif
+
+/****************************************************************************
+ * Name: netinit_bringup_ipv4_policy
+ *
+ * Description:
+ *   Apply the shared IPv4 policy during initial bring-up.  Runtime setters
+ *   and boot DHCP share g_ipv4_policy_lock so static config is not
+ *   overwritten.
+ *
+ * Returned Value:
+ *   OK on success; -EAGAIN when DHCP lease is still pending.
+ *
+ ****************************************************************************/
+
+static int netinit_bringup_ipv4_policy(void)
+{
+#ifdef CONFIG_NETUTILS_DHCPC
+  struct netinit_ipv4_config local;
+  unsigned int generation;
+  bool policy_static = false;
+  bool use_dhcp = false;
+
+  pthread_mutex_lock(&g_ipv4_policy_lock);
+  if (g_ipv4_policy_valid)
+    {
+      if (g_ipv4_policy.mode == NETINIT_IPV4_STATIC)
+        {
+          local = g_ipv4_policy;
+          policy_static = true;
+          g_use_dhcpc = false;
+        }
+      else
+        {
+          use_dhcp = true;
+          g_use_dhcpc = true;
+        }
+    }
+  else
+    {
+      use_dhcp = g_use_dhcpc;
+      if (use_dhcp)
+        {
+          netinit_seed_boot_policy_locked(true);
+        }
+    }
+
+  generation = g_ipv4_policy_generation;
+
+  if (policy_static)
+    {
+      int ret = netinit_apply_static_locked(&local);
+
+      pthread_mutex_unlock(&g_ipv4_policy_lock);
+      return ret;
+    }
+
+  pthread_mutex_unlock(&g_ipv4_policy_lock);
+
+  if (use_dhcp)
+    {
+      if (netinit_obtain_ipv4addr(generation) < 0)
+        {
+          return -EAGAIN;
+        }
+    }
+
+  return OK;
+#else
+  return OK;
+#endif
+}
+
+/****************************************************************************
+ * Name: netinit_apply_static_locked
+ *
+ * Description:
+ *   Apply static IPv4 address/mask/router/DNS.  Caller holds policy lock.
+ *
+ ****************************************************************************/
+
+static int netinit_apply_static_locked(
+  FAR const struct netinit_ipv4_config *config)
+{
+  int ret;
+
+#ifdef CONFIG_NETUTILS_DHCPC
+  g_use_dhcpc = false;
+#endif
+
+  ret = netlib_set_ipv4addr(NET_DEVNAME, &config->address);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  ret = netlib_set_ipv4netmask(NET_DEVNAME, &config->netmask);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  ret = netlib_set_dripv4addr(NET_DEVNAME, &config->router);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  return netinit_replace_dns(&config->dns);
+}
+
+/****************************************************************************
+ * Name: netinit_apply_dhcp_locked
+ *
+ * Description:
+ *   Clear static addressing and enable DHCP.  Caller holds policy lock.
+ *   When carrier is absent, only the policy is stored.
+ *
+ ****************************************************************************/
+
+static int netinit_apply_dhcp_locked(bool have_carrier)
+{
+  struct in_addr addr;
+
+#ifdef CONFIG_NETUTILS_DHCPC
+  g_use_dhcpc = true;
+#else
+  UNUSED(have_carrier);
+  return -ENOSYS;
+#endif
+
+  UNUSED(have_carrier);
+
+  addr.s_addr = INADDR_ANY;
+  netlib_set_dripv4addr(NET_DEVNAME, &addr);
+  netlib_set_ipv4netmask(NET_DEVNAME, &addr);
+  netlib_set_ipv4addr(NET_DEVNAME, &addr);
+
+  /* Drop previous static/preferred DNS; DHCP lease installs lease DNS.
+   * Do not block here on netlib_obtain_ipv4addr(); bring-up and the
+   * carrier monitor own lease acquisition under the same policy.
+   */
+
+  netinit_clear_dns();
+  return OK;
+}
+
+/****************************************************************************
+ * Name: netinit_carrier_is_running
+ ****************************************************************************/
+
+static bool netinit_carrier_is_running(int sd)
+{
+  struct ifreq ifr;
+  int ret;
+
+  memset(&ifr, 0, sizeof(ifr));
+  strlcpy(ifr.ifr_name, NET_DEVNAME, IFNAMSIZ);
+  ret = ioctl(sd, SIOCGIFFLAGS, (unsigned long)&ifr);
+  if (ret < 0)
+    {
+      return false;
+    }
+
+  return (ifr.ifr_flags & IFF_RUNNING) != 0;
+}
+
+/****************************************************************************
+ * Name: netinit_carrier_monitor
+ *
+ * Description:
+ *   Follow driver-published carrier edges while preserving IFF_UP.
+ *   On recovery, re-apply the retained DHCP or static policy.
+ *
+ ****************************************************************************/
+
+#ifdef CONFIG_NETINIT_CARRIER_POLL
+static int netinit_carrier_monitor(void)
+{
+  struct in_addr addr;
+  struct ifreq ifr;
+  unsigned int retry_msec = 0;
+  bool last_running = false;
+  bool initialized = false;
+  bool running;
+  int ret;
+  int sd;
+
+  sd = socket(NET_SOCK_FAMILY, NET_SOCK_TYPE, NET_SOCK_PROTOCOL);
+  if (sd < 0)
+    {
+      ret = -errno;
+      nerr("ERROR: Failed to create carrier monitor socket: %d\n", ret);
+      return ret;
+    }
+
+  for (; ; )
+    {
+      memset(&ifr, 0, sizeof(ifr));
+      strlcpy(ifr.ifr_name, NET_DEVNAME, IFNAMSIZ);
+      ret = ioctl(sd, SIOCGIFFLAGS, (unsigned long)&ifr);
+      if (ret < 0)
+        {
+          nerr("ERROR: Failed to read interface flags: %d\n", errno);
+          goto wait;
+        }
+
+      running = (ifr.ifr_flags & IFF_RUNNING) != 0;
+      if (!initialized || running != last_running)
+        {
+          ninfo("%s carrier %s\n", NET_DEVNAME,
+                running ? "up" : "down");
+
+          pthread_mutex_lock(&g_ipv4_policy_lock);
+
+          if (!running)
+            {
+              netinit_clear_ipv4();
+              retry_msec = 0;
+            }
+          else
+            {
+              netinit_reapply_policy_locked(true);
+#ifdef CONFIG_NETUTILS_DHCPC
+              if (g_use_dhcpc)
+                {
+                  addr.s_addr = INADDR_ANY;
+                  netlib_get_ipv4addr(NET_DEVNAME, &addr);
+                  if (addr.s_addr == INADDR_ANY)
+                    {
+                      retry_msec = CONFIG_NETINIT_DHCP_RETRYMSEC;
+                    }
+                }
+#endif
+            }
+
+          pthread_mutex_unlock(&g_ipv4_policy_lock);
+
+          last_running = running;
+          initialized = true;
+        }
+#ifdef CONFIG_NETUTILS_DHCPC
+      else if (running)
+        {
+          unsigned int generation;
+          bool use_dhcp;
+
+          pthread_mutex_lock(&g_ipv4_policy_lock);
+          use_dhcp = g_use_dhcpc;
+          generation = g_ipv4_policy_generation;
+          pthread_mutex_unlock(&g_ipv4_policy_lock);
+
+          if (use_dhcp)
+            {
+              addr.s_addr = INADDR_ANY;
+              netlib_get_ipv4addr(NET_DEVNAME, &addr);
+              if (addr.s_addr == INADDR_ANY)
+                {
+                  if (retry_msec <= CONFIG_NETINIT_CARRIER_POLL_MSEC)
+                    {
+                      if (netinit_obtain_ipv4addr(generation) < 0)
+                        {
+                          retry_msec = CONFIG_NETINIT_DHCP_RETRYMSEC;
+                        }
+                    }
+                  else
+                    {
+                      retry_msec -= CONFIG_NETINIT_CARRIER_POLL_MSEC;
+                    }
+                }
+              else
+                {
+                  retry_msec = 0;
+                }
+            }
+        }
+#endif
+
+wait:
+      usleep(CONFIG_NETINIT_CARRIER_POLL_MSEC * 1000);
+    }
+}
+#endif /* CONFIG_NETINIT_CARRIER_POLL */
+#endif /* CONFIG_NET_IPv4 */
+
 /****************************************************************************
  * Name: netinit_thread
  *
@@ -990,6 +1562,12 @@ static pthread_addr_t netinit_thread(pthread_addr_t arg)
   /* Monitor the network status */
 
   netinit_monitor();
+#endif
+
+#ifdef CONFIG_NETINIT_CARRIER_POLL
+  /* Monitor driver-published carrier state without changing IFF_UP. */
+
+  netinit_carrier_monitor();
 #endif
 
   ninfo("Exit\n");
@@ -1053,5 +1631,107 @@ int netinit_bringup(void)
   return OK;
 #endif
 }
+
+/****************************************************************************
+ * Name: netinit_set_ipv4_config
+ ****************************************************************************/
+
+#if defined(CONFIG_NET_IPv4) && defined(NETINIT_HAVE_NETDEV)
+int netinit_set_ipv4_config(FAR const struct netinit_ipv4_config *config)
+{
+  struct netinit_ipv4_config local;
+  bool have_carrier = false;
+  int sd;
+  int ret = OK;
+
+  if (config == NULL)
+    {
+      return -EINVAL;
+    }
+
+  if (config->mode != NETINIT_IPV4_DHCP &&
+      config->mode != NETINIT_IPV4_STATIC)
+    {
+      return -EINVAL;
+    }
+
+  if (config->mode == NETINIT_IPV4_STATIC)
+    {
+      if (config->address.s_addr == INADDR_ANY ||
+          config->netmask.s_addr == INADDR_ANY)
+        {
+          return -EINVAL;
+        }
+    }
+
+  local = *config;
+
+  sd = socket(NET_SOCK_FAMILY, NET_SOCK_TYPE, NET_SOCK_PROTOCOL);
+  if (sd >= 0)
+    {
+      have_carrier = netinit_carrier_is_running(sd);
+      close(sd);
+    }
+
+  pthread_mutex_lock(&g_ipv4_policy_lock);
+  g_ipv4_policy = local;
+  g_ipv4_policy_valid = true;
+  g_ipv4_policy_generation++;
+
+  if (local.mode == NETINIT_IPV4_STATIC)
+    {
+#ifdef CONFIG_NETUTILS_DHCPC
+      g_use_dhcpc = false;
+#endif
+      if (have_carrier)
+        {
+          ret = netinit_apply_static_locked(&local);
+        }
+    }
+  else
+    {
+      /* Store DHCP policy without blocking on lease acquisition. */
+
+      ret = netinit_apply_dhcp_locked(have_carrier);
+    }
+
+  pthread_mutex_unlock(&g_ipv4_policy_lock);
+  return ret;
+}
+
+int netinit_get_ipv4_config(FAR struct netinit_ipv4_config *config)
+{
+  if (config == NULL)
+    {
+      return -EINVAL;
+    }
+
+  pthread_mutex_lock(&g_ipv4_policy_lock);
+  *config = g_ipv4_policy;
+  pthread_mutex_unlock(&g_ipv4_policy_lock);
+  return OK;
+}
+#endif /* CONFIG_NET_IPv4 && NETINIT_HAVE_NETDEV */
+
+#if defined(CONFIG_NET_IPv4) && !defined(NETINIT_HAVE_NETDEV)
+
+int netinit_set_ipv4_config(FAR const struct netinit_ipv4_config *config)
+{
+  UNUSED(config);
+  return -ENOSYS;
+}
+
+int netinit_get_ipv4_config(FAR struct netinit_ipv4_config *config)
+{
+  if (config == NULL)
+    {
+      return -EINVAL;
+    }
+
+  memset(config, 0, sizeof(*config));
+  config->mode = NETINIT_IPV4_DHCP;
+  return -ENOSYS;
+}
+#endif /* !NETINIT_HAVE_NETDEV */
 
 #endif /* CONFIG_NETUTILS_NETINIT */
