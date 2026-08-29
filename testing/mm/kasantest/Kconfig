@@ -5,6 +5,11 @@
 
 config TESTING_KASAN
 	tristate "KASan validity test"
+	depends on MM_KASAN_GENERIC && MM_KASAN_INSTRUMENT_ALL
+	depends on MM_KASAN_REGIONS >= 2
+	depends on !MM_KASAN_DISABLE_READ_PANIC
+	depends on !MM_KASAN_DISABLE_WRITE_PANIC
+	depends on SCHED_WAITPID && !BUILD_KERNEL
 	default n
 	---help---
 		Enable the KASan validity test
@@ -21,10 +26,10 @@ config TESTING_KASAN_STACKSIZE
 
 config TESTING_KASAN_PERF_HEAP_SIZE
 	int "KASan test heap size"
-	default 1024000
+	default 32768
 
 config TESTING_KASAN_PERF_CYCLES
 	int "KASan test performance cycles"
-	default 4096
+	default 256
 
 endif

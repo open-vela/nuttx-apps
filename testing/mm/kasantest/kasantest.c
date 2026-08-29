@@ -23,8 +23,10 @@
  ****************************************************************************/
 
 #include <assert.h>
+#include <errno.h>
 #include <malloc.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,12 +61,12 @@ typedef struct testcase_s
 {
   bool (*func)(FAR struct mm_heap_s *heap, size_t size);
   bool is_auto;
+  bool expect_fault;
   FAR const char *name;
 } testcase_t;
 
 typedef struct run_s
 {
-  char argv[32];
   FAR const testcase_t *testcase;
   FAR struct mm_heap_s *heap;
   size_t size;
@@ -141,48 +143,48 @@ static bool test_stack_overflow(FAR struct mm_heap_s *heap, size_t size);
 
 const static testcase_t g_kasan_test[] =
 {
-  {test_heap_underflow, true, "heap underflow"},
-  {test_heap_overflow, true, "heap overflow"},
-  {test_heap_use_after_free, true, "heap use after free"},
-  {test_heap_invalid_free, true, "heap invalid free"},
-  {test_heap_double_free, true, "heap double free"},
-  {test_heap_poison, true, "heap poison"},
-  {test_heap_unpoison, true, "heap unpoison"},
-  {test_heap_illegal_memchr, true, "heap illegal memchr"},
-  {test_heap_illegal_memcpy, true, "heap illegal memcpy"},
-  {test_heap_illegal_memcmp, true, "heap illegal memcmp"},
-  {test_heap_illegal_memmove, true, "heap illegal memmove"},
-  {test_heap_illegal_memset, true, "heap illegal memset"},
-  {test_heap_illegal_strcmp, true, "heap illegal strcmp"},
-  {test_heap_illegal_strcpy, true, "heap illegal strcpy"},
-  {test_heap_illegal_strlen, true, "heap illegal strlen"},
-  {test_heap_illegal_strncpy, true, "heap illegal strncpy"},
-  {test_heap_illegal_strchr, true, "heap illegal strchr"},
-  {test_heap_illegal_strncmp, true, "heap illegal strncmp"},
-  {test_heap_illegal_strnlen, true, "heap illegal strnlen"},
-  {test_heap_illegal_strrchr, true, "heap illegal strrchr"},
-  {test_heap_legal_memchr, true, "heap legal memchr"},
-  {test_heap_legal_memcpy, true, "heap legal memcpy"},
-  {test_heap_legal_memcmp, true, "heap legal memcmp"},
-  {test_heap_legal_memmove, true, "heap legal memmove"},
-  {test_heap_legal_memset, true, "heap legal memset"},
-  {test_heap_legal_strcmp, true, "heap legal strcmp"},
-  {test_heap_legal_strcpy, true, "heap legal strlen"},
-  {test_heap_legal_strlen, true, "heap legal strlen"},
-  {test_heap_legal_strncpy, true, "heap legal strncpy"},
-  {test_heap_legal_strchr, true, "heap legal strchr"},
-  {test_heap_legal_strncmp, true, "heap legal strncmp"},
-  {test_heap_legal_strnlen, true, "heap legal strnlen"},
-  {test_heap_legal_strrchr, true, "heap legal strrchr"},
-  {test_insert_perf, false, "Kasan insert performance"},
-  {test_algorithm_perf, false, "Kasan algorithm performance"},
+  {test_heap_underflow, true, true, "heap underflow"},
+  {test_heap_overflow, true, true, "heap overflow"},
+  {test_heap_use_after_free, true, true, "heap use after free"},
+  {test_heap_invalid_free, true, true, "heap invalid free"},
+  {test_heap_double_free, true, true, "heap double free"},
+  {test_heap_poison, true, true, "heap poison"},
+  {test_heap_unpoison, true, false, "heap unpoison"},
+  {test_heap_illegal_memchr, true, true, "heap illegal memchr"},
+  {test_heap_illegal_memcpy, true, true, "heap illegal memcpy"},
+  {test_heap_illegal_memcmp, true, true, "heap illegal memcmp"},
+  {test_heap_illegal_memmove, true, true, "heap illegal memmove"},
+  {test_heap_illegal_memset, true, true, "heap illegal memset"},
+  {test_heap_illegal_strcmp, true, true, "heap illegal strcmp"},
+  {test_heap_illegal_strcpy, true, true, "heap illegal strcpy"},
+  {test_heap_illegal_strlen, true, true, "heap illegal strlen"},
+  {test_heap_illegal_strncpy, true, true, "heap illegal strncpy"},
+  {test_heap_illegal_strchr, true, true, "heap illegal strchr"},
+  {test_heap_illegal_strncmp, true, true, "heap illegal strncmp"},
+  {test_heap_illegal_strnlen, true, true, "heap illegal strnlen"},
+  {test_heap_illegal_strrchr, true, true, "heap illegal strrchr"},
+  {test_heap_legal_memchr, true, false, "heap legal memchr"},
+  {test_heap_legal_memcpy, true, false, "heap legal memcpy"},
+  {test_heap_legal_memcmp, true, false, "heap legal memcmp"},
+  {test_heap_legal_memmove, true, false, "heap legal memmove"},
+  {test_heap_legal_memset, true, false, "heap legal memset"},
+  {test_heap_legal_strcmp, true, false, "heap legal strcmp"},
+  {test_heap_legal_strcpy, true, false, "heap legal strcpy"},
+  {test_heap_legal_strlen, true, false, "heap legal strlen"},
+  {test_heap_legal_strncpy, true, false, "heap legal strncpy"},
+  {test_heap_legal_strchr, true, false, "heap legal strchr"},
+  {test_heap_legal_strncmp, true, false, "heap legal strncmp"},
+  {test_heap_legal_strnlen, true, false, "heap legal strnlen"},
+  {test_heap_legal_strrchr, true, false, "heap legal strrchr"},
+  {test_insert_perf, false, false, "Kasan insert performance"},
+  {test_algorithm_perf, false, false, "Kasan algorithm performance"},
 #ifdef KASANTEST_GLOBAL
-  {test_global_underflow, true, "globals underflow"},
-  {test_global_overflow, true, "globals overflow"},
+  {test_global_underflow, true, true, "globals underflow"},
+  {test_global_overflow, true, true, "globals overflow"},
 #endif
 #ifdef KASANTEST_STACK
-  {test_stack_underflow, true, "stack underflow"},
-  {test_stack_overflow, true, "stack overflow"},
+  {test_stack_underflow, true, true, "stack underflow"},
+  {test_stack_overflow, true, true, "stack overflow"},
 #endif
 };
 
@@ -209,6 +211,16 @@ static void error_handler(void)
     }
 }
 
+static void print_heap_access(FAR const char *name, size_t requested,
+                              FAR const void *base, size_t usable,
+                              FAR const volatile void *target)
+{
+  printf("KASANTEST access: case=%s requested=%zu base=%p "
+         "usable=%zu target=%p\n",
+         name, requested, base, usable, (FAR const void *)target);
+  fflush(stdout);
+}
+
 static void timespec_sub(struct timespec *dest,
                          struct timespec *ts1,
                          struct timespec *ts2)
@@ -226,25 +238,55 @@ static void timespec_sub(struct timespec *dest,
 static bool test_heap_underflow(FAR struct mm_heap_s *heap, size_t size)
 {
   FAR uint8_t *mem = mm_malloc(heap, size);
-  *(mem - 1) = 0x12;
+  FAR volatile uint8_t *target;
+  size_t usable;
+
+  if (mem == NULL)
+    {
+      return false;
+    }
+
+  usable = mm_malloc_size(heap, mem);
+  target = mem - 1;
+  print_heap_access("heap underflow", size, mem, usable, target);
+  *target = 0x12;
   return false;
 }
 
 static bool test_heap_overflow(FAR struct mm_heap_s *heap, size_t size)
 {
   FAR uint8_t *mem = mm_malloc(heap, size);
-  size = mm_malloc_size(heap, mem);
+  FAR volatile uint8_t *target;
+  size_t usable;
 
-  mem[size + 1] = 0x11;
+  if (mem == NULL)
+    {
+      return false;
+    }
+
+  usable = mm_malloc_size(heap, mem);
+  target = mem + usable;
+  print_heap_access("heap overflow", size, mem, usable, target);
+  *target = 0x11;
   return false;
 }
 
 static bool test_heap_use_after_free(FAR struct mm_heap_s *heap, size_t size)
 {
   FAR uint8_t *mem = mm_malloc(heap, size);
+  FAR volatile uint8_t *target;
+  size_t usable;
 
+  if (mem == NULL)
+    {
+      return false;
+    }
+
+  usable = mm_malloc_size(heap, mem);
+  target = mem;
   mm_free(heap, mem);
-  mem[0] = 0x10;
+  print_heap_access("heap use after free", size, mem, usable, target);
+  *target = 0x10;
   return false;
 }
 
@@ -426,12 +468,21 @@ static bool test_heap_illegal_strrchr(FAR struct mm_heap_s *heap,
 static bool test_heap_legal_memchr(FAR struct mm_heap_s *heap, size_t size)
 {
   FAR char *mem = mm_malloc(heap, size);
-  size = mm_malloc_size(heap, mem);
+  FAR volatile char *target;
+  size_t usable;
 
-  memset(mem, 0, size);
-  mem[size - 1] = 0x01;
+  if (mem == NULL)
+    {
+      return false;
+    }
 
-  return memchr(mem, 0x01, size);
+  usable = mm_malloc_size(heap, mem);
+  target = mem + usable - 1;
+  print_heap_access("heap legal memchr", size, mem, usable, target);
+  memset(mem, 0, usable);
+  *target = 0x01;
+
+  return memchr(mem, 0x01, usable) == (FAR void *)target;
 }
 
 static bool test_heap_legal_memcpy(FAR struct mm_heap_s *heap, size_t size)
@@ -575,6 +626,7 @@ static bool test_insert_perf(FAR struct mm_heap_s *heap, size_t size)
     }
   while (num++ < CONFIG_TESTING_KASAN_PERF_CYCLES);
 
+  free(p);
   return true;
 }
 
@@ -596,7 +648,14 @@ static bool test_algorithm_perf(FAR struct mm_heap_s *heap, size_t size)
     }
   while (num++ < CONFIG_TESTING_KASAN_PERF_CYCLES);
 
+  free(p);
   return true;
+}
+
+static bool test_status_passed(FAR const testcase_t *test, int status)
+{
+  return !test->expect_fault && WIFEXITED(status) &&
+         WEXITSTATUS(status) == EXIT_SUCCESS;
 }
 
 #ifdef KASANTEST_GLOBAL
@@ -629,40 +688,69 @@ static bool test_stack_overflow(FAR struct mm_heap_s *heap, size_t size)
 }
 #endif
 
+static int run_child(int argc, FAR char *argv[])
+{
+  FAR run_t *run = (FAR run_t *)g_kasan_heap;
+  struct timespec result;
+  struct timespec start;
+  struct timespec end;
+  bool ret;
+
+  clock_gettime(CLOCK_MONOTONIC, &start);
+  ret = run->testcase->func(run->heap, run->size);
+  clock_gettime(CLOCK_MONOTONIC, &end);
+
+  timespec_sub(&result, &end, &start);
+  printf("%s spending %ld.%lds\n", run->testcase->name,
+         result.tv_sec, result.tv_nsec);
+
+  if (run->testcase->expect_fault)
+    {
+      printf("KASANTEST expected fault was not triggered\n");
+      return EXIT_SUCCESS;
+    }
+
+  return ret ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
 static int run_test(FAR const testcase_t *test)
 {
   size_t heap_size = sizeof(g_kasan_heap) - sizeof(run_t);
-  FAR char *argv[3];
   FAR run_t *run;
   int status;
+  int ret;
   pid_t pid;
 
-  /* There is a memory leak here because we cannot guarantee that
-   * it can be released correctly.
-   */
-
   run = (run_t *)g_kasan_heap;
-  if (!run)
-    {
-      return ERROR;
-    }
-
-  snprintf(run->argv, sizeof(run->argv), "%p", run);
   run->testcase = test;
   run->size = rand() % (heap_size / 2) + 1;
   run->heap = mm_initialize("kasan", (struct mm_heap_s *)&run[1], heap_size);
   if (!run->heap)
     {
-      free(run);
       return ERROR;
     }
 
-  argv[0] = "kasantest";
-  argv[1] = run->argv;
-  argv[2] = NULL;
+  pid = task_create("kasantest", CONFIG_TESTING_KASAN_PRIORITY,
+                    CONFIG_TESTING_KASAN_STACKSIZE, run_child, NULL);
+  if (pid < 0)
+    {
+      printf("KASANTEST task create failed: %d\n", errno);
+      mm_uninitialize(run->heap);
+      return ERROR;
+    }
 
-  posix_spawn(&pid, "kasantest", NULL, NULL, argv, NULL);
-  waitpid(pid, &status, 0);
+  do
+    {
+      ret = waitpid(pid, &status, 0);
+    }
+  while (ret < 0 && errno == EINTR);
+
+  if (ret != pid)
+    {
+      printf("KASANTEST wait failed: %d\n", errno);
+      return ERROR;
+    }
+
   mm_uninitialize(run->heap);
   return status;
 }
@@ -670,10 +758,6 @@ static int run_test(FAR const testcase_t *test)
 static int run_testcase(int argc, FAR char *argv[])
 {
   uintptr_t index = strtoul(argv[1], NULL, 0);
-  struct timespec result;
-  struct timespec start;
-  struct timespec end;
-  FAR run_t *run;
   int ret;
 
   /* Pass in the number to run the specified case,
@@ -689,23 +773,49 @@ static int run_testcase(int argc, FAR char *argv[])
         }
       else
         {
-          run_test(&g_kasan_test[index - 1]);
+          FAR const testcase_t *test = &g_kasan_test[index - 1];
+
+          ret = run_test(test);
+          if (ret == ERROR)
+            {
+              printf("KASANTEST result: case=%lu name=%s FAIL status=%d\n",
+                     (unsigned long)index, test->name, ret);
+              return EXIT_FAILURE;
+            }
+
+          if (test->expect_fault)
+            {
+              if (WIFEXITED(ret) && WEXITSTATUS(ret) == EXIT_SUCCESS)
+                {
+                  printf("KASANTEST result: case=%lu name=%s FAIL "
+                         "status=%d\n",
+                         (unsigned long)index, test->name, ret);
+                }
+              else
+                {
+                  printf("KASANTEST result: case=%lu name=%s FAULT "
+                         "status=%d verification=required\n",
+                         (unsigned long)index, test->name, ret);
+                }
+
+              return EXIT_FAILURE;
+            }
+
+          if (!test_status_passed(test, ret))
+            {
+              printf("KASANTEST result: case=%lu name=%s FAIL status=%d\n",
+                     (unsigned long)index, test->name, ret);
+              return EXIT_FAILURE;
+            }
+
+          printf("KASANTEST result: case=%lu name=%s PASS status=%d\n",
+                 (unsigned long)index, test->name, ret);
         }
 
       return EXIT_SUCCESS;
     }
 
-  run = (FAR run_t *)(uintptr_t)strtoul(argv[1], NULL, 16);
-  clock_gettime(CLOCK_MONOTONIC, &start);
-  ret = run->testcase->func(run->heap, run->size);
-  clock_gettime(CLOCK_MONOTONIC, &end);
-
-  timespec_sub(&result, &end, &start);
-  printf("%s spending %ld.%lds\n", run->testcase->name,
-                                   result.tv_sec,
-                                   result.tv_nsec);
-
-  return ret;
+  return EXIT_FAILURE;
 }
 
 /****************************************************************************
@@ -715,6 +825,7 @@ static int run_testcase(int argc, FAR char *argv[])
 int main(int argc, FAR char *argv[])
 {
   int status[nitems(g_kasan_test)];
+  bool passed = true;
   size_t i;
 
   if (argc < 2)
@@ -732,10 +843,25 @@ int main(int argc, FAR char *argv[])
         {
           if (g_kasan_test[i].is_auto)
             {
-              printf("KASan Test: %s -> %s\n",
-                      g_kasan_test[i].name,
-                      status[i]? "\033[32mPASS\033[0m" :
-                                 "\033[31mFAIL\033[0m");
+              bool test_passed;
+
+              test_passed = test_status_passed(&g_kasan_test[i], status[i]);
+              if (g_kasan_test[i].expect_fault &&
+                  !(WIFEXITED(status[i]) &&
+                    WEXITSTATUS(status[i]) == EXIT_SUCCESS))
+                {
+                  printf("KASan Test: %s -> FAULT "
+                         "(external report verification required)\n",
+                         g_kasan_test[i].name);
+                }
+              else
+                {
+                  printf("KASan Test: %s -> %s\n", g_kasan_test[i].name,
+                         test_passed ? "\033[32mPASS\033[0m" :
+                                       "\033[31mFAIL\033[0m");
+                }
+
+              passed &= test_passed;
             }
         }
     }
@@ -744,5 +870,5 @@ int main(int argc, FAR char *argv[])
       return run_testcase(argc, argv);
     }
 
-  return EXIT_SUCCESS;
+  return passed ? EXIT_SUCCESS : EXIT_FAILURE;
 }

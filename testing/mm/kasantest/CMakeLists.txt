@@ -28,5 +28,15 @@ if(CONFIG_TESTING_KASAN)
       -Wno-free-nonheap-object
       -Wno-stringop-overflow
       "-O0")
-  nuttx_add_application(NAME kasantest COMPILE_FLAGS ${CFLAGS} SRCS kasantest.c)
+  nuttx_add_application(
+    NAME
+    kasantest
+    PRIORITY
+    ${CONFIG_TESTING_KASAN_PRIORITY}
+    STACKSIZE
+    ${CONFIG_TESTING_KASAN_STACKSIZE}
+    COMPILE_FLAGS
+    ${CFLAGS}
+    SRCS
+    kasantest.c)
 endif()
