@@ -27,7 +27,11 @@ LVGL_DIR_NAME = lvgl
 
 -include ./lvgl/lvgl.mk
 
--include ./lvgl/tests/Makefile
+# On case-insensitive filesystems (macOS) the upstream lvgl/tests/makefile
+# directory shadows this optional Makefile, so only include a real file.
+ifneq ($(shell test -f ./lvgl/tests/Makefile && echo y),)
+include ./lvgl/tests/Makefile
+endif
 
 ifneq ($(CONFIG_LV_USE_LIBPNG),)
 CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/external/libpng

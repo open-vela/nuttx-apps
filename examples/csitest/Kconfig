@@ -1,0 +1,33 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_CSITEST
+	tristate "MIPI CSI camera capture test"
+	default n
+	depends on DRIVERS_VIDEO
+	---help---
+		Enable the minimal V4L2 capture test application.  It captures
+		RGB565 frames from /dev/video0 with user-pointer buffers and
+		prints per-frame statistics (first bytes, checksum, frame
+		interval).
+
+if EXAMPLES_CSITEST
+
+config EXAMPLES_CSITEST_PROGNAME
+	string "Program name"
+	default "csitest"
+	---help---
+		This is the name of the program that will be used when the NSH
+		ELF program is installed.
+
+config EXAMPLES_CSITEST_PRIORITY
+	int "csitest task priority"
+	default 100
+
+config EXAMPLES_CSITEST_STACKSIZE
+	int "csitest stack size"
+	default 4096
+
+endif
