@@ -43,6 +43,10 @@
 #include <nuttx/audio/audio.h>
 #include <nuttx/video/video.h>
 
+#if defined(CONFIG_NET) && defined(CONFIG_NETUTILS_DHCPC)
+#  include <netutils/netlib.h>
+#endif
+
 #include <lvgl/lvgl.h>
 
 /****************************************************************************
@@ -721,6 +725,7 @@ int esph_ui_request_scan(void);
 int esph_ui_request_connect(FAR const char *ssid, FAR const char *pass);
 int esph_ui_copy_status(FAR char *dst, size_t dstlen);
 int esph_ui_copy_scan(FAR char *dst, size_t dstlen, FAR int *count);
+bool esph_ui_is_connected(void);
 
 static lv_obj_t *g_wifi_panel;
 static lv_obj_t *g_wifi_status;
@@ -729,6 +734,52 @@ static lv_obj_t *g_wifi_pass;
 static lv_obj_t *g_wifi_kb;
 static char g_wifi_sel[33];
 static char g_wifi_scan_last[512];
+
+#if defined(CONFIG_NET) && defined(CONFIG_NETUTILS_DHCPC)
+static volatile int g_wifi_dhcp_state;
+static unsigned int g_wifi_dhcp_retry_ticks;
+
+static FAR void *avdemo_wifi_dhcp_thread(FAR void *arg)
+{
+  int ret;
+  int errcode;
+
+  (void)arg;
+  ret = netlib_ifup("eth0");
+  if (ret >= 0)
+    {
+      ret = netlib_obtain_ipv4addr("eth0");
+    }
+
+  errcode = errno;
+  g_wifi_dhcp_state = ret >= 0 ? 2 : -1;
+  printf("avdemo: Wi-Fi DHCP %s (ret=%d errno=%d)\n",
+         ret >= 0 ? "ready" : "failed", ret, errcode);
+  return NULL;
+}
+
+static void avdemo_wifi_start_dhcp(void)
+{
+  pthread_attr_t attr;
+  pthread_t thread;
+  int ret;
+
+  g_wifi_dhcp_state = 1;
+  pthread_attr_init(&attr);
+  pthread_attr_setstacksize(&attr, 8192);
+  ret = pthread_create(&thread, &attr, avdemo_wifi_dhcp_thread, NULL);
+  pthread_attr_destroy(&attr);
+  if (ret == 0)
+    {
+      pthread_detach(thread);
+    }
+  else
+    {
+      g_wifi_dhcp_state = -1;
+      printf("avdemo: Wi-Fi DHCP thread failed (%d)\n", ret);
+    }
+}
+#endif
 
 static void avdemo_wifi_ssid_cb(FAR lv_event_t *e)
 {
@@ -795,6 +846,23 @@ static void avdemo_wifi_timer_cb(FAR lv_timer_t *timer)
 
   (void)timer;
 
+#if defined(CONFIG_NET) && defined(CONFIG_NETUTILS_DHCPC)
+  if (esph_ui_is_connected())
+    {
+      if (g_wifi_dhcp_state == 0 ||
+          (g_wifi_dhcp_state < 0 && ++g_wifi_dhcp_retry_ticks >= 15))
+        {
+          g_wifi_dhcp_retry_ticks = 0;
+          avdemo_wifi_start_dhcp();
+        }
+    }
+  else if (g_wifi_dhcp_state != 1)
+    {
+      g_wifi_dhcp_state = 0;
+      g_wifi_dhcp_retry_ticks = 0;
+    }
+#endif
+
   if (g_wifi_panel == NULL ||
       lv_obj_has_flag(g_wifi_panel, LV_OBJ_FLAG_HIDDEN))
     {
@@ -802,6 +870,21 @@ static void avdemo_wifi_timer_cb(FAR lv_timer_t *timer)
     }
 
   esph_ui_copy_status(buf, sizeof(buf));
+#if defined(CONFIG_NET) && defined(CONFIG_NETUTILS_DHCPC)
+  if (g_wifi_dhcp_state == 1)
+    {
+      strlcat(buf, " / DHCP...", sizeof(buf));
+    }
+  else if (g_wifi_dhcp_state == 2)
+    {
+      strlcat(buf, " / IP ready", sizeof(buf));
+    }
+  else if (g_wifi_dhcp_state < 0)
+    {
+      strlcat(buf, " / DHCP retrying", sizeof(buf));
+    }
+#endif
+
   lv_label_set_text(g_wifi_status, buf);
 
   esph_ui_copy_scan(buf, sizeof(buf), &count);
@@ -908,8 +991,6 @@ static void avdemo_wifi_open_cb(FAR lv_event_t *e)
   lv_obj_set_size(g_wifi_kb, 640, 230);
   lv_obj_align(g_wifi_kb, LV_ALIGN_BOTTOM_MID, 0, 0);
   lv_keyboard_set_textarea(g_wifi_kb, g_wifi_pass);
-
-  lv_timer_create(avdemo_wifi_timer_cb, 700, NULL);
 }
 
 static void avdemo_wifi_button(FAR lv_obj_t *scr)
@@ -924,6 +1005,10 @@ static void avdemo_wifi_button(FAR lv_obj_t *scr)
   lbl = lv_label_create(btn);
   lv_label_set_text(lbl, LV_SYMBOL_WIFI " Wi-Fi");
   lv_obj_center(lbl);
+
+  /* Keep connection/DHCP state moving even while the panel is closed. */
+
+  lv_timer_create(avdemo_wifi_timer_cb, 700, NULL);
 }
 #endif /* CONFIG_ESP32P4_SDMMC */
 
