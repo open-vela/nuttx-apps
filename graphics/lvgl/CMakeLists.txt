@@ -150,6 +150,10 @@ if(CONFIG_GRAPHICS_LVGL)
       lvgl PRIVATE ${NUTTX_APPS_DIR}/../${CONFIG_LV_DRAW_VG_LITE_INCLUDE})
   endif()
 
+  if(CONFIG_LV_USE_SIFLI_EPIC)
+    target_link_libraries(lvgl PRIVATE sifli_hal)
+  endif()
+
   if(NOT CONFIG_LV_ASSERT_HANDLER_INCLUDE STREQUAL "")
     target_compile_definitions(lvgl PRIVATE "LV_ASSERT_HANDLER=ASSERT(0)\;")
   endif()
