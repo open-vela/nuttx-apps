@@ -93,9 +93,10 @@ static void iperf_showusage(FAR const char *progname)
          "  -p, --port=<port>    server port to listen on/connect to\n"
          "  -i, --interval=<interval> seconds between periodic bandwidth"
          " reports\n"
-         "  -t, --time=<time>    time in seconds to transmit for (default 10"
+         "  -t, --time=<time>    time in seconds to transmit for (default %d"
          " secs)\n"
-         "  -a, --abort          abort running iperf\n");
+         "  -a, --abort          abort running iperf\n",
+         IPERF_DEFAULT_TIME);
 }
 
 /****************************************************************************
@@ -154,9 +155,17 @@ int main(int argc, FAR char *argv[])
 
   struct option loptions[] =
   {
+    {"client", required_argument, 0, 'c'},
+    {"server", no_argument, 0, 's'},
+    {"udp", no_argument, 0, 'u'},
     {"local", optional_argument, 0, 'L'},
     {"rpmsg", required_argument, 0, 'R'},
     {"vsock", required_argument, 0, 'V'},
+    {"bind", required_argument, 0, 'B'},
+    {"port", required_argument, 0, 'p'},
+    {"interval", required_argument, 0, 'i'},
+    {"time", required_argument, 0, 't'},
+    {"abort", no_argument, 0, 'a'},
     {0, 0, 0, 0}
   };
 
@@ -173,7 +182,7 @@ int main(int argc, FAR char *argv[])
   cfg.sport = IPERF_DEFAULT_PORT;
   cfg.dport = IPERF_DEFAULT_PORT;
 
-  while ((opt = getopt_long(argc, argv, "sua:c:B:p:i:t:",
+  while ((opt = getopt_long(argc, argv, "suac:B:p:i:t:",
                             loptions, NULL)) != -1)
     {
       switch (opt)
