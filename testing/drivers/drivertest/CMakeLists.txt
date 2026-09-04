@@ -437,7 +437,7 @@ if(CONFIG_TESTING_DRIVER_TEST)
       drivertest_regulator.c)
   endif()
 
-  if(CONFIG_LV_USE_NUTTX_TOUCHSCREEN)
+  if(CONFIG_GRAPHICS_LVGL AND CONFIG_LV_USE_NUTTX_TOUCHSCREEN)
     nuttx_add_application(
       NAME
       cmocka_driver_touchpanel

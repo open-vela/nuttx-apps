@@ -24,11 +24,14 @@ if(CONFIG_AUDIOUTILS_ALSA_LIB)
     PRIVATE bits_convert.c
             channels_map.c
             error.c
-            pcm_dmix.c
             pcm_hw.c
             pcm_params.c
             pcm_softvol.c
             pcm.c)
+
+  if(CONFIG_AUDIOUTILS_ALSA_LIB_DEVICE_DMIX)
+    target_sources(apps PRIVATE pcm_dmix.c)
+  endif()
 
   set_source_files_properties(pcm_params.c TARGET_DIRECTORY apps
                               PROPERTIES COMPILE_FLAGS "-Wno-array-bounds")

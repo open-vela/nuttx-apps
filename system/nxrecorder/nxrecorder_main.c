@@ -342,11 +342,19 @@ static int nxrecorder_cmd_stop(FAR struct nxrecorder_s *precorder,
 static int nxrecorder_cmd_pause(FAR struct nxrecorder_s *precorder,
                                 FAR char *parg)
 {
-  /* Pause the record */
+  int ret;
 
-  nxrecorder_pause(precorder);
+  ret = nxrecorder_pause(precorder);
+  if (ret < 0)
+    {
+      printf("Pause failed: %d\n", ret);
+    }
+  else
+    {
+      printf("Recording paused\n");
+    }
 
-  return OK;
+  return ret;
 }
 #endif
 
@@ -362,11 +370,19 @@ static int nxrecorder_cmd_pause(FAR struct nxrecorder_s *precorder,
 static int nxrecorder_cmd_resume(FAR struct nxrecorder_s *precorder,
                                  FAR char *parg)
 {
-  /* Resume the record */
+  int ret;
 
-  nxrecorder_resume(precorder);
+  ret = nxrecorder_resume(precorder);
+  if (ret < 0)
+    {
+      printf("Resume failed: %d\n", ret);
+    }
+  else
+    {
+      printf("Recording resumed\n");
+    }
 
-  return OK;
+  return ret;
 }
 #endif
 
@@ -592,6 +608,11 @@ int main(int argc, FAR char *argv[])
                   continue;
                 }
 
+              if (arg == NULL)
+                {
+                  arg = "";
+                }
+
               /* Remove leading spaces from arg */
 
               while (*arg == ' ')
@@ -621,6 +642,11 @@ int main(int argc, FAR char *argv[])
 
                       break;
                     }
+                }
+
+              if (x == g_nxrecorder_cmd_count)
+                {
+                  printf("%s: unknown nxrecorder command\n", cmd);
                 }
             }
           else
