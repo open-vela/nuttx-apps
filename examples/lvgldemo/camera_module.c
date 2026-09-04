@@ -1,14 +1,22 @@
 /****************************************************************************
  * apps/examples/lvgldemo/camera_module.c
  *
- * 摄像头模块：SC2336(MIPI-CSI) 采集并显示到 LVGL 预览 canvas。
+ * Camera module: SC2336 (MIPI-CSI) capture and display into the LVGL
+ * preview canvas.
  *
- *  - SC2336 通过 /dev/i2c0 初始化（RAW8 1280x720 30fps，2 lane，24MHz，
- *    336Mbps —— 与 ESP-IDF 已验证配置一致）
- *  - 帧经芯片侧 esp32p4_mipi_csi 驱动 DMA 进 PSRAM 双缓冲
- *  - LVGL 定时器轮询新帧：裁剪到预览区宽高比，最近邻缩放为灰度 RGB565
+ *  - SC2336 is initialized through /dev/i2c0 (RAW8 1280x720 30fps,
+ *    2 lanes, 24MHz xtal, 336Mbps -- matching the ESP-IDF verified
+ *    configuration)
+ *  - Frames are DMA'd into PSRAM double buffers by the in-tree
+ *    esp32p4_mipi_csi driver
+ *  - An LVGL timer polls for new frames: crop to the preview aspect
+ *    ratio, nearest-neighbor scale into grayscale RGB565
  *
  * SPDX-License-Identifier: Apache-2.0
+ ****************************************************************************/
+
+/****************************************************************************
+ * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
@@ -26,13 +34,43 @@
 #include <sys/ioctl.h>
 #include <unistd.h>
 
-#include "lvgl/lvgl.h"
 #include "camera_module.h"
+#include "lvgl/lvgl.h"
 #include "ui_main.h"
 
 /****************************************************************************
- * 芯片侧 CSI 驱动声明（内核编译，这里 extern 引用）
+ * Pre-processor Definitions
  ****************************************************************************/
+
+/* SC2336 register addresses (verified against ESP-IDF esp_cam_sensor,
+ * Apache-2.0)
+ */
+
+#define SC2336_REG_SLEEP_MODE   0x0100
+#define SC2336_REG_SOFTWARE_RST 0x0103
+#define SC2336_REG_END          0xffff
+
+#define SC2336_I2C_BUS          "/dev/i2c0"
+#define SC2336_I2C_ADDR         0x30
+#define SC2336_I2C_FREQ         400000
+
+/* Capture resolution and preview window size */
+
+#define CAM_W   1280
+#define CAM_H   720
+#define VIEW_W  560
+#define VIEW_H  418
+
+#define SC2336_TABLE_SIZE \
+  (sizeof(sc2336_reg_init) / sizeof(sc2336_reg_init[0]))
+
+/****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+/* Chip-side CSI driver interface (compiled into the kernel; referenced
+ * with extern declarations here)
+ */
 
 struct esp32p4_mipi_csi_config_s
 {
@@ -43,7 +81,24 @@ struct esp32p4_mipi_csi_config_s
   uint32_t in_bpp;
 };
 
-typedef void (*esp32p4_mipi_csi_frame_cb_t)(void *buf, size_t len, void *arg);
+typedef void (*esp32p4_mipi_csi_frame_cb_t)(void *buf, size_t len,
+                                            void *arg);
+
+/* Camera init state machine (locates hangs; shown on screen) */
+
+typedef enum
+{
+  CAM_STATE_IDLE = 0,
+  CAM_STATE_SENSOR,     /* SC2336 I2C init */
+  CAM_STATE_CSI_INIT,   /* MIPI-CSI driver init */
+  CAM_STATE_CSI_START,  /* MIPI-CSI start + frame buffers */
+  CAM_STATE_STREAMING,  /* streaming frames */
+  CAM_STATE_ERROR,      /* init failed */
+} cam_state_t;
+
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
 
 extern int esp32p4_mipi_csi_initialize(
   const struct esp32p4_mipi_csi_config_s *cfg);
@@ -54,19 +109,11 @@ extern uint32_t esp32p4_mipi_csi_frame_count(void);
 extern size_t esp32p4_mipi_csi_framelen(void);
 extern void *esp32p4_mipi_csi_get_frame(void);
 
-/****************************************************************************
- * SC2336 寄存器表（ESP-IDF esp_cam_sensor 已验证，Apache-2.0）
- ****************************************************************************/
+/* SC2336 register table: MIPI 2-lane, 24MHz input, 1280x720 RAW8 30fps
+ * (verified against ESP-IDF esp_cam_sensor, Apache-2.0)
+ */
 
-#define SC2336_REG_SLEEP_MODE  0x0100
-#define SC2336_REG_SOFTWARE_RST 0x0103
-#define SC2336_REG_END         0xffff
-
-static const struct
-{
-  uint16_t reg;
-  uint8_t  val;
-} sc2336_mipi_2lane_24Minput_1280x720_raw8_30fps[] =
+static const struct sc2336_reg_s sc2336_reg_init[] =
 {
   { 0x0103, 0x01 },
   { 0x0100, 0x00 },
@@ -237,22 +284,12 @@ static const struct
   { SC2336_REG_END, 0x00 },
 };
 
-#define SC2336_TABLE_SIZE \
-  (sizeof(sc2336_mipi_2lane_24Minput_1280x720_raw8_30fps) / \
-   sizeof(sc2336_mipi_2lane_24Minput_1280x720_raw8_30fps[0]))
+/* Frame capture state */
 
-/****************************************************************************
- * Private Data
- ****************************************************************************/
-
-#define SC2336_I2C_BUS   "/dev/i2c0"
-#define SC2336_I2C_ADDR  0x30
-#define SC2336_I2C_FREQ  400000
-
-#define CAM_W   1280
-#define CAM_H   720
-#define VIEW_W  560
-#define VIEW_H  418
+static struct camera_frame_s s_current_frame;
+static camera_frame_callback_t s_frame_callback = NULL;
+static void *s_frame_callback_arg = NULL;
+static bool s_new_frame_available = false;
 
 static int g_i2c_fd = -1;
 static lv_obj_t *s_canvas = NULL;
@@ -262,43 +299,46 @@ static uint32_t s_last_frames = 0;
 static bool s_running = false;
 static pthread_t s_init_thread;
 
-/* 帧捕获相关变量 */
-static struct camera_frame_s s_current_frame;
-static camera_frame_callback_t s_frame_callback = NULL;
-static void *s_frame_callback_arg = NULL;
-static bool s_new_frame_available = false;
-
-/* 摄像头初始化状态机（便于定位卡在哪一步 / 在屏幕上显示） */
-typedef enum
-{
-  CAM_STATE_IDLE = 0,
-  CAM_STATE_SENSOR,    /* SC2336 I2C 初始化 */
-  CAM_STATE_CSI_INIT,  /* MIPI-CSI 驱动初始化 */
-  CAM_STATE_CSI_START, /* MIPI-CSI 启动 + 分配帧缓冲 */
-  CAM_STATE_STREAMING, /* 取帧显示中 */
-  CAM_STATE_ERROR,     /* 初始化失败 */
-} cam_state_t;
-
 static volatile cam_state_t s_state = CAM_STATE_IDLE;
-static const char *s_fail_step = NULL;  /* 失败的具体步骤（sensor/csi_init/...） */
-static int s_fail_rc = 0;               /* 失败的错误码/寄存器 */
-static int s_fail_errno = 0;            /* 失败时的 errno */
+static const char *s_fail_step = NULL;  /* failing step (sensor/csi_...) */
+static int s_fail_rc = 0;               /* failing error code / register */
+static int s_fail_errno = 0;            /* errno captured at failure */
+
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
 
 static const char *cam_state_str(cam_state_t s)
 {
   switch (s)
     {
-      case CAM_STATE_IDLE:     return "IDLE";
-      case CAM_STATE_SENSOR:   return "SENSOR";
-      case CAM_STATE_CSI_INIT: return "CSI_INIT";
-      case CAM_STATE_CSI_START:return "CSI_START";
-      case CAM_STATE_STREAMING:return "STREAMING";
-      case CAM_STATE_ERROR:    return "ERROR";
-      default:                 return "?";
+      case CAM_STATE_IDLE:
+        return "IDLE";
+
+      case CAM_STATE_SENSOR:
+        return "SENSOR";
+
+      case CAM_STATE_CSI_INIT:
+        return "CSI_INIT";
+
+      case CAM_STATE_CSI_START:
+        return "CSI_START";
+
+      case CAM_STATE_STREAMING:
+        return "STREAMING";
+
+      case CAM_STATE_ERROR:
+        return "ERROR";
+
+      default:
+        return "?";
     }
 }
 
-/* 状态进度直接写到 UART0（/dev/ttyS0），绕过自循环的 USB 控制台，LA 可抓 */
+/* Status progress goes straight to UART0 (/dev/ttyS0), bypassing the
+ * self-looped USB console, so a logic analyzer can capture it.
+ */
+
 static void cam_trace(const char *step, int rc)
 {
   int fd = open("/dev/ttyS0", O_WRONLY | O_NONBLOCK);
@@ -319,10 +359,6 @@ static void cam_trace(const char *step, int rc)
 
   close(fd);
 }
-
-/****************************************************************************
- * Private Functions
- ****************************************************************************/
 
 static int sc2336_write_reg(uint16_t reg, uint8_t val)
 {
@@ -354,7 +390,10 @@ static int sc2336_write_reg(uint16_t reg, uint8_t val)
   return ret;
 }
 
-/* 读 SC2336 寄存器（SCCB：写 2 字节寄存器地址，再读 1 字节） */
+/* Read an SC2336 register (SCCB: write the 2-byte register address,
+ * then read 1 byte)
+ */
+
 static int sc2336_read_reg(uint16_t reg, uint8_t *val)
 {
   struct i2c_msg_s msg[2];
@@ -367,7 +406,7 @@ static int sc2336_read_reg(uint16_t reg, uint8_t *val)
 
   msg[0].frequency = SC2336_I2C_FREQ;
   msg[0].addr      = SC2336_I2C_ADDR;
-  msg[0].flags     = I2C_M_NOSTOP;  /* SCCB：写完地址不释放总线，直接续读 */
+  msg[0].flags     = I2C_M_NOSTOP;
   msg[0].buffer    = addr;
   msg[0].length    = 2;
 
@@ -389,9 +428,13 @@ static int sc2336_read_reg(uint16_t reg, uint8_t *val)
   return ret;
 }
 
-/* 写完整初始化表并开流 */
+/* Write the full init table and start streaming */
+
 static int sc2336_init(void)
 {
+  uint8_t id_hi = 0;
+  uint8_t id_lo = 0;
+  int id_ok;
   size_t i;
   int ret;
 
@@ -405,32 +448,34 @@ static int sc2336_init(void)
       return -1;
     }
 
-  /* 读取芯片 ID（0x3107=0xcb, 0x3108=0x3a），确认传感器在总线上 */
-  {
-    uint8_t id_hi = 0;
-    uint8_t id_lo = 0;
-    int id_ok;
+  /* Read the chip ID (0x3107=0xcb, 0x3108=0x3a) to confirm the sensor
+   * is on the bus
+   */
 
-    ret = sc2336_read_reg(0x3107, &id_hi);
-    if (ret >= 0)
-      {
-        ret = sc2336_read_reg(0x3108, &id_lo);
-      }
+  ret = sc2336_read_reg(0x3107, &id_hi);
+  if (ret >= 0)
+    {
+      ret = sc2336_read_reg(0x3108, &id_lo);
+    }
 
-    id_ok = (ret >= 0 && id_hi == 0xcb && id_lo == 0x3a);
-    cam_trace("chip_id", (id_hi << 8) | id_lo);
-    if (!id_ok)
-      {
-        _err("SC2336: bad chip id 0x%02x%02x (ret=%d)\n", id_hi, id_lo, ret);
-        s_fail_step = "chip_id";
-        s_fail_rc = (id_hi << 8) | id_lo;
-        return -1;
-      }
-  }
+  id_ok = (ret >= 0 && id_hi == 0xcb && id_lo == 0x3a);
+  cam_trace("chip_id", (id_hi << 8) | id_lo);
+  if (!id_ok)
+    {
+      _err("SC2336: bad chip id 0x%02x%02x (ret=%d)\n", id_hi, id_lo,
+           ret);
+      s_fail_step = "chip_id";
+      s_fail_rc = (id_hi << 8) | id_lo;
+      return -1;
+    }
 
-  /* 软复位(0x0103)后必须等传感器重新稳定（模拟/时钟域重新上电），
-   * 否则后续 0x0100 写会 NACK/卡总线。ESP-IDF 依赖完整上电时序，
-   * 这里显式等待 50ms（此前因无等待导致 0x0100 失败）。 */
+  /* After a soft reset (0x0103) the sensor must be given time to
+   * stabilize (analog / clock domain power-up), otherwise the
+   * following 0x0100 write may NACK or hang the bus. ESP-IDF relies
+   * on the full power-up sequence; here we wait 50ms explicitly (a
+   * missing wait caused 0x0100 failures earlier).
+   */
+
   ret = sc2336_write_reg(SC2336_REG_SOFTWARE_RST, 0x01);
   if (ret < 0)
     {
@@ -443,11 +488,14 @@ static int sc2336_init(void)
 
   usleep(50 * 1000);
 
-  /* 从表第二项开始写（表首就是刚写过的软复位 0x0103） */
+  /* Write from the second table entry on (the first entry is the soft
+   * reset 0x0103 just written above)
+   */
+
   for (i = 1; i < SC2336_TABLE_SIZE; i++)
     {
-      uint16_t reg = sc2336_mipi_2lane_24Minput_1280x720_raw8_30fps[i].reg;
-      uint8_t val = sc2336_mipi_2lane_24Minput_1280x720_raw8_30fps[i].val;
+      uint16_t reg = sc2336_reg_init[i].reg;
+      uint8_t val = sc2336_reg_init[i].val;
 
       if (reg == SC2336_REG_END)
         {
@@ -464,11 +512,15 @@ static int sc2336_init(void)
           return -1;
         }
 
-      /* 每个寄存器写之间给 ~10ms settle（SC2336 模拟/时序寄存器需要较长时间） */
+      /* ~10ms settle between register writes (the SC2336 analog /
+       * timing registers need longer)
+       */
+
       usleep(10 * 1000);
     }
 
-  /* 开流（从 sleep 进入 streaming） */
+  /* Start streaming (from sleep into streaming) */
+
   ret = sc2336_write_reg(SC2336_REG_SLEEP_MODE, 0x01);
   if (ret < 0)
     {
@@ -482,7 +534,10 @@ static int sc2336_init(void)
   return 0;
 }
 
-/* LVGL 定时器：有新帧则裁剪缩放为灰度并刷新 canvas */
+/* LVGL timer: when a new frame is available, crop/scale it to
+ * grayscale and refresh the canvas
+ */
+
 static void camera_poll_cb(lv_timer_t *timer)
 {
   const uint8_t *src;
@@ -505,7 +560,10 @@ static void camera_poll_cb(lv_timer_t *timer)
       return;
     }
 
-  /* 裁剪到预览区宽高比（560/418 ≈ 1.34），横向居中 */
+  /* Crop to the preview aspect ratio (560/418 ~= 1.34), horizontally
+   * centered
+   */
+
   const uint32_t crop_w = 965;
   const uint32_t crop_x = 157;
 
@@ -529,7 +587,8 @@ static void camera_poll_cb(lv_timer_t *timer)
 
   lv_obj_invalidate(s_canvas);
 
-  /* 更新帧数据结构供AI推理使用 */
+  /* Update the frame data structure for AI inference */
+
   s_current_frame.data = src;
   s_current_frame.width = CAM_W;
   s_current_frame.height = CAM_H;
@@ -537,18 +596,18 @@ static void camera_poll_cb(lv_timer_t *timer)
   s_current_frame.frame_count = frames;
   s_new_frame_available = true;
 
-  /* 调用帧回调（如果已注册） */
+  /* Invoke the frame callback (if registered) */
+
   if (s_frame_callback != NULL)
     {
       s_frame_callback(&s_current_frame, s_frame_callback_arg);
     }
 }
 
-/****************************************************************************
- * Public Functions
- ****************************************************************************/
+/* Set up the canvas buffer and create the polling timer inside the
+ * LVGL thread (lv_async_call callback)
+ */
 
-/* 在 LVGL 线程中设置 canvas 缓冲并创建轮询定时器（lv_async_call 回调） */
 static void camera_display_setup(void *user_data)
 {
   (void)user_data;
@@ -573,10 +632,12 @@ static void camera_display_setup(void *user_data)
         CAM_W, CAM_H, VIEW_W, VIEW_H);
 }
 
-/* 独立线程做阻塞式初始化（传感器 I2C / CSI 时钟 / DMA）。
- * 状态机：IDLE -> SENSOR -> CSI_INIT -> CSI_START -> STREAMING / ERROR。
- * 即使某步挂起，也不会阻塞 LVGL 主线程与心跳，系统照常运行。
+/* Do the blocking initialization (sensor I2C / CSI clocks / DMA) in a
+ * dedicated thread. State machine: IDLE -> SENSOR -> CSI_INIT ->
+ * CSI_START -> STREAMING / ERROR. Even if a step hangs, the LVGL main
+ * thread and heartbeat are not blocked; the system keeps running.
  */
+
 static void *camera_init_thread(void *arg)
 {
   struct esp32p4_mipi_csi_config_s csi_cfg;
@@ -584,7 +645,8 @@ static void *camera_init_thread(void *arg)
 
   (void)arg;
 
-  /* 预览缓冲（PSRAM/堆，CPU 读写，无 DMA） */
+  /* Preview buffer (PSRAM/heap, CPU read/write, no DMA) */
+
   s_view_buf = (uint16_t *)malloc(VIEW_W * VIEW_H * 2);
   if (s_view_buf == NULL)
     {
@@ -595,7 +657,8 @@ static void *camera_init_thread(void *arg)
       return NULL;
     }
 
-  /* 状态：SC2336 传感器初始化 */
+  /* State: SC2336 sensor init */
+
   s_state = CAM_STATE_SENSOR;
   cam_trace("sensor", 0);
   ret = sc2336_init();
@@ -608,7 +671,8 @@ static void *camera_init_thread(void *arg)
       return NULL;
     }
 
-  /* 状态：CSI 驱动初始化（RAW8 1280x720, 2 lane, 336Mbps） */
+  /* State: CSI driver init (RAW8 1280x720, 2 lanes, 336Mbps) */
+
   s_state = CAM_STATE_CSI_INIT;
   cam_trace("csi_init", 0);
   memset(&csi_cfg, 0, sizeof(csi_cfg));
@@ -629,7 +693,8 @@ static void *camera_init_thread(void *arg)
       return NULL;
     }
 
-  /* 状态：CSI 启动（分配 PSRAM 双缓冲 + DMA 开始） */
+  /* State: CSI start (allocate PSRAM double buffers + DMA start) */
+
   s_state = CAM_STATE_CSI_START;
   cam_trace("csi_start", 0);
   ret = esp32p4_mipi_csi_start(NULL, NULL);
@@ -642,16 +707,23 @@ static void *camera_init_thread(void *arg)
       return NULL;
     }
 
-  /* 状态：流式取帧中 */
+  /* State: streaming frames */
+
   s_state = CAM_STATE_STREAMING;
   cam_trace("streaming", 0);
 
-  /* 初始化完成：交给 LVGL 线程设置显示 */
+  /* Initialization complete: hand over to the LVGL thread for the
+   * display setup
+   */
+
   lv_async_call(camera_display_setup, NULL);
   return NULL;
 }
 
-/* LVGL 定时器：把摄像头状态机文本刷新到屏幕右上角状态标签 */
+/* LVGL timer: refresh the camera state-machine text into the top-right
+ * status label
+ */
+
 static void camera_status_cb(lv_timer_t *timer)
 {
   char buf[48];
@@ -689,6 +761,26 @@ static void camera_status_cb(lv_timer_t *timer)
   ui_main_set_camera_status(buf);
 }
 
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
+
+/****************************************************************************
+ * Name: camera_module_start
+ *
+ * Description:
+ *   Start the camera module: create the status display timer and run
+ *   the blocking initialization in a separate thread.
+ *
+ * Input Parameters:
+ *   canvas - The LVGL canvas object to render preview frames into.
+ *
+ * Returned Value:
+ *   0 on success (initialization continues in the background); -1 on
+ *   immediate failure.
+ *
+ ****************************************************************************/
+
 int camera_module_start(lv_obj_t *canvas)
 {
   if (s_running)
@@ -702,11 +794,18 @@ int camera_module_start(lv_obj_t *canvas)
       return -1;
     }
 
-  /* 状态显示定时器（LVGL 线程内创建，刷新初始化状态机到屏幕） */
+  /* Status display timer (created in the LVGL thread; refreshes the
+   * init state machine on screen)
+   */
+
   lv_timer_create(camera_status_cb, 250, NULL);
 
-  /* 非阻塞：初始化在独立线程中执行，避免挂起卡死主界面 */
-  if (pthread_create(&s_init_thread, NULL, camera_init_thread, NULL) != 0)
+  /* Non-blocking: initialization runs in a separate thread so that a
+   * hang cannot freeze the main UI
+   */
+
+  if (pthread_create(&s_init_thread, NULL, camera_init_thread, NULL)
+      != 0)
     {
       _err("CAM: failed to create init thread\n");
       return -1;
@@ -714,6 +813,15 @@ int camera_module_start(lv_obj_t *canvas)
 
   return 0;
 }
+
+/****************************************************************************
+ * Name: camera_module_stop
+ *
+ * Description:
+ *   Stop the camera module: delete the poll timer, stop the CSI
+ *   driver and release the resources.
+ *
+ ****************************************************************************/
 
 void camera_module_stop(void)
 {
@@ -745,6 +853,18 @@ void camera_module_stop(void)
   s_running = false;
 }
 
+/****************************************************************************
+ * Name: camera_module_get_frame
+ *
+ * Description:
+ *   Fetch the latest captured frame for inference.
+ *
+ * Returned Value:
+ *   A pointer to the latest frame, or NULL when no new frame is
+ *   available.
+ *
+ ****************************************************************************/
+
 const struct camera_frame_s *camera_module_get_frame(void)
 {
   if (!s_running || !s_new_frame_available)
@@ -755,6 +875,21 @@ const struct camera_frame_s *camera_module_get_frame(void)
   s_new_frame_available = false;
   return &s_current_frame;
 }
+
+/****************************************************************************
+ * Name: camera_module_register_frame_callback
+ *
+ * Description:
+ *   Register a callback invoked on every new frame.
+ *
+ * Input Parameters:
+ *   callback  - The frame callback function.
+ *   user_data - Opaque argument passed back with each invocation.
+ *
+ * Returned Value:
+ *   0 on success; -EINVAL when the callback is NULL.
+ *
+ ****************************************************************************/
 
 int camera_module_register_frame_callback(camera_frame_callback_t callback,
                                           void *user_data)
@@ -769,11 +904,30 @@ int camera_module_register_frame_callback(camera_frame_callback_t callback,
   return 0;
 }
 
+/****************************************************************************
+ * Name: camera_module_unregister_frame_callback
+ *
+ * Description:
+ *   Remove the previously registered frame callback.
+ *
+ ****************************************************************************/
+
 void camera_module_unregister_frame_callback(void)
 {
   s_frame_callback = NULL;
   s_frame_callback_arg = NULL;
 }
+
+/****************************************************************************
+ * Name: camera_module_has_new_frame
+ *
+ * Description:
+ *   Report whether a new frame is available.
+ *
+ * Returned Value:
+ *   true when a new frame is ready; false otherwise.
+ *
+ ****************************************************************************/
 
 bool camera_module_has_new_frame(void)
 {

@@ -1,11 +1,16 @@
 /****************************************************************************
  * apps/examples/lvgldemo/audio_beep.c
  *
- * 扬声器提示音播放。
+ * Speaker beep placeholder implementation.
  *
- * 说明：当前为占位实现（播放逻辑未接入），扬声器链路（ES8311 + I2S）
- * 在 openvela 侧完成后，替换此文件为真实播放实现。UI 通过
- * board_audio_beep() 触发提示音，二者解耦。
+ * The real playback path (ES8311 + I2S on the openvela side) is not
+ * wired yet; once it lands, replace the body of board_audio_beep()
+ * with an actual playback implementation. The UI only calls
+ * board_audio_beep(), so the two sides stay decoupled.
+ ****************************************************************************/
+
+/****************************************************************************
+ * Included Files
  ****************************************************************************/
 
 #include <nuttx/config.h>
@@ -27,12 +32,13 @@
  * Name: board_audio_beep
  *
  * Description:
- *   播放一句话/提示音。真实实现待接入 openvela 音频链路后补充。
+ *   Play a short beep / spoken prompt. The real implementation will be
+ *   added once the openvela audio path is ready.
  ****************************************************************************/
 
 void board_audio_beep(void)
 {
 #if defined(CONFIG_AUDIO) && defined(CONFIG_AUDIO_I2S)
-  /* 占位：后续实现通过 /dev/audio/pcm0 播放合成提示音。 */
+  /* Placeholder: play a synthesized beep via /dev/audio/pcm0 later. */
 #endif
 }

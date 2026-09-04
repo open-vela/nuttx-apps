@@ -57,17 +57,22 @@
 #  define NEED_BOARDINIT 1
 #endif
 
-/****************************************************************************
- * Private Type Declarations
- ****************************************************************************/
+#define BOOT_DURATION_MS 3000u
+
+/* Starting-up status text (Chinese, \u-escaped) */
+
+#define BOOT_STATUS_TEXT "\u6b63\u5728\u542f\u52a8"
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
 
-/* 338 官方板级 (esp32p4_bringup.c) 的 LVGL 看门狗引用此心跳计数，由 demo
- * 主循环每轮递增。官方公开仓未随板级发布配套定义，这里补齐符号。
+/* The LVGL watchdog in the official board bring-up (esp32p4_bringup.c)
+ * references this heartbeat counter, which the demo main loop increments
+ * on every iteration. The upstream board code does not provide the
+ * symbol, so it is defined here.
  */
+
 volatile uint32_t g_lvgl_heartbeat = 0;
 
 /****************************************************************************
@@ -99,6 +104,43 @@ static void lv_nuttx_uv_loop(uv_loop_t *loop, lv_nuttx_result_t *result)
   lv_nuttx_uv_deinit(&data);
 }
 #endif
+
+/****************************************************************************
+ * Name: boot_screen_run
+ *
+ * Description:
+ *   Show the boot screen (white background, openvela logo, progress
+ *   bar) for BOOT_DURATION_MS. lv_timer_handler() must keep being
+ *   called during this period, otherwise the progress bar will not
+ *   move.
+ ****************************************************************************/
+
+static void boot_screen_run(void)
+{
+  static const char *const boot_dots[] =
+  {
+    BOOT_STATUS_TEXT,
+    BOOT_STATUS_TEXT ".",
+    BOOT_STATUS_TEXT "..",
+    BOOT_STATUS_TEXT "...",
+  };
+
+  uint32_t t0 = lv_tick_get();
+
+  boot_screen_show(lv_screen_active());
+
+  while (lv_tick_get() - t0 < BOOT_DURATION_MS)
+    {
+      uint32_t dt = lv_tick_get() - t0;
+      int pct = (int)((dt * 100u) / BOOT_DURATION_MS);
+
+      boot_screen_update(pct, boot_dots[(dt / 300u) % 4]);
+
+      lv_timer_handler();
+      g_lvgl_heartbeat++;
+      usleep(16 * 1000);
+    }
+}
 
 /****************************************************************************
  * Public Functions
@@ -160,36 +202,18 @@ int main(int argc, FAR char *argv[])
       return 1;
     }
 
-  /* 开机界面：白底 openvela logo + 底部进度条，约 3 秒。
-   * 期间必须持续调用 lv_timer_handler() 渲染，进度条才会动。
-   */
-  boot_screen_show(lv_screen_active());
+  /* Boot screen for about 3 seconds, then switch to the main UI */
 
-#define BOOT_DURATION_MS 3000u
-  {
-    static const char *const boot_dots[] =
-    {
-      "正在启动", "正在启动.", "正在启动..", "正在启动...",
-    };
-    uint32_t t0 = lv_tick_get();
+  boot_screen_run();
 
-    while (lv_tick_get() - t0 < BOOT_DURATION_MS)
-      {
-        uint32_t dt = lv_tick_get() - t0;
-        int pct = (int)((dt * 100u) / BOOT_DURATION_MS);
+  /* Enter the sign-language recognition main UI (light card layout) */
 
-        boot_screen_update(pct, boot_dots[(dt / 300u) % 4]);
-
-        lv_timer_handler();
-        g_lvgl_heartbeat++;
-        usleep(16 * 1000);
-      }
-  }
-
-  /* 进入手语识别主界面（浅色卡片布局） */
   ui_main_create(lv_screen_active());
 
-  /* 启动摄像头：SC2336 初始化 + CSI 取帧显示到预览 canvas */
+  /* Start the camera: SC2336 init + CSI frame capture into the
+   * preview canvas
+   */
+
   if (camera_module_start(ui_main_get_camera_canvas()) != 0)
     {
       LV_LOG_WARN("camera module failed to start, continue without it");
