@@ -27,4 +27,14 @@ config EXAMPLES_LVGLDEMO_INPUT_DEVPATH
 	---help---
 		The path to the touchscreen device. Default: "/dev/input0"
 
+config EXAMPLES_LVGLDEMO_SIGNBRIDGE
+	bool "SignBridge UI with boot screen and camera preview"
+	default n
+	---help---
+		Replace the default LVGL demo screen with the SignBridge UI:
+		boot screen (openvela logo), recognition result cards and a
+		SC2336 camera preview through the ESP32-P4 MIPI-CSI driver.
+		Enable only on targets providing the esp32p4 MIPI-CSI driver
+		(e.g. esp32p4-function-ev-board).
+
 endif # EXAMPLES_LVGLDEMO

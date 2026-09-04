@@ -32,6 +32,12 @@
 #include <uv.h>
 #endif
 
+#ifdef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
+#  include "boot_screen.h"
+#  include "ui_main.h"
+#  include "camera_module.h"
+#endif
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -53,13 +59,27 @@
 #  define NEED_BOARDINIT 1
 #endif
 
-/****************************************************************************
- * Private Type Declarations
- ****************************************************************************/
+#ifdef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
+
+#define BOOT_DURATION_MS 3000u
+
+/* Starting-up status text (Chinese, \u-escaped) */
+
+#define BOOT_STATUS_TEXT "\u6b63\u5728\u542f\u52a8"
+
+#endif
 
 /****************************************************************************
  * Private Data
  ****************************************************************************/
+
+/* The LVGL watchdog in the official board bring-up (esp32p4_bringup.c)
+ * references this heartbeat counter, which the demo main loop increments
+ * on every iteration. The upstream board code does not provide the
+ * symbol, so it is defined here.
+ */
+
+volatile uint32_t g_lvgl_heartbeat = 0;
 
 /****************************************************************************
  * Private Functions
@@ -88,6 +108,45 @@ static void lv_nuttx_uv_loop(uv_loop_t *loop, lv_nuttx_result_t *result)
   data = lv_nuttx_uv_init(&uv_info);
   uv_run(loop, UV_RUN_DEFAULT);
   lv_nuttx_uv_deinit(&data);
+}
+#endif
+
+/****************************************************************************
+ * Name: boot_screen_run
+ *
+ * Description:
+ *   Show the boot screen (white background, openvela logo, progress
+ *   bar) for BOOT_DURATION_MS. lv_timer_handler() must keep being
+ *   called during this period, otherwise the progress bar will not
+ *   move.
+ ****************************************************************************/
+
+#ifdef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
+static void boot_screen_run(void)
+{
+  static const char *const boot_dots[] =
+  {
+    BOOT_STATUS_TEXT,
+    BOOT_STATUS_TEXT ".",
+    BOOT_STATUS_TEXT "..",
+    BOOT_STATUS_TEXT "...",
+  };
+
+  uint32_t t0 = lv_tick_get();
+
+  boot_screen_show(lv_screen_active());
+
+  while (lv_tick_get() - t0 < BOOT_DURATION_MS)
+    {
+      uint32_t dt = lv_tick_get() - t0;
+      int pct = (int)((dt * 100u) / BOOT_DURATION_MS);
+
+      boot_screen_update(pct, boot_dots[(dt / 300u) % 4]);
+
+      lv_timer_handler();
+      g_lvgl_heartbeat++;
+      usleep(16 * 1000);
+    }
 }
 #endif
 
@@ -151,6 +210,26 @@ int main(int argc, FAR char *argv[])
       return 1;
     }
 
+#ifdef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
+  /* Boot screen for about 3 seconds, then switch to the main UI */
+
+  boot_screen_run();
+
+  /* Enter the sign-language recognition main UI (light card layout) */
+
+  ui_main_create(lv_screen_active());
+
+  /* Start the camera: SC2336 init + CSI frame capture into the
+   * preview canvas
+   */
+
+  if (camera_module_start(ui_main_get_camera_canvas()) != 0)
+    {
+      LV_LOG_WARN("camera module failed to start, continue without it");
+    }
+#else
+  /* Default LVGL demo framework (no SignBridge UI configured) */
+
   if (!lv_demos_create(&argv[1], argc - 1))
     {
       lv_demos_show_help();
@@ -159,6 +238,7 @@ int main(int argc, FAR char *argv[])
 
       goto demo_end;
     }
+#endif
 
 #ifdef CONFIG_LV_USE_NUTTX_LIBUV
   lv_nuttx_uv_loop(&ui_loop, &result);
@@ -167,6 +247,7 @@ int main(int argc, FAR char *argv[])
     {
       uint32_t idle;
       idle = lv_timer_handler();
+      g_lvgl_heartbeat++;
 
       /* Minimum sleep of 1ms */
 
@@ -175,7 +256,9 @@ int main(int argc, FAR char *argv[])
     }
 #endif
 
+#ifndef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
 demo_end:
+#endif
   lv_nuttx_deinit(&result);
   lv_deinit();
 
