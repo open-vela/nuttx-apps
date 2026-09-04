@@ -28,7 +28,12 @@ MODULE = $(CONFIG_EXAMPLES_LVGLDEMO)
 # LVGL demo Example
 
 MAINSRC = lvgldemo.c
+
+# SignBridge UI modules (ESP32-P4 camera preview + Chinese fonts)
+
+ifeq ($(CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE),y)
 CSRCS += ui_main.c boot_screen.c audio_beep.c camera_module.c
 CSRCS += zh_font_16.c zh_font_40.c logo_data.c
+endif
 
 include $(APPDIR)/Application.mk

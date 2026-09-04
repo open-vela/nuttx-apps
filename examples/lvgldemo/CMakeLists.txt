@@ -19,6 +19,13 @@
 # ##############################################################################
 
 if(CONFIG_EXAMPLES_LVGLDEMO)
+  set(LVGLDEMO_SRCS lvgldemo.c)
+
+  if(CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE)
+    list(APPEND LVGLDEMO_SRCS ui_main.c boot_screen.c audio_beep.c
+         camera_module.c zh_font_16.c zh_font_40.c logo_data.c)
+  endif()
+
   nuttx_add_application(
     NAME
     lvgldemo
@@ -31,5 +38,5 @@ if(CONFIG_EXAMPLES_LVGLDEMO)
     DEPENDS
     lvgl
     SRCS
-    lvgldemo.c)
+    ${LVGLDEMO_SRCS})
 endif()

@@ -32,9 +32,11 @@
 #include <uv.h>
 #endif
 
-#include "boot_screen.h"
-#include "ui_main.h"
-#include "camera_module.h"
+#ifdef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
+#  include "boot_screen.h"
+#  include "ui_main.h"
+#  include "camera_module.h"
+#endif
 
 /****************************************************************************
  * Pre-processor Definitions
@@ -57,11 +59,15 @@
 #  define NEED_BOARDINIT 1
 #endif
 
+#ifdef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
+
 #define BOOT_DURATION_MS 3000u
 
 /* Starting-up status text (Chinese, \u-escaped) */
 
 #define BOOT_STATUS_TEXT "\u6b63\u5728\u542f\u52a8"
+
+#endif
 
 /****************************************************************************
  * Private Data
@@ -115,6 +121,7 @@ static void lv_nuttx_uv_loop(uv_loop_t *loop, lv_nuttx_result_t *result)
  *   move.
  ****************************************************************************/
 
+#ifdef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
 static void boot_screen_run(void)
 {
   static const char *const boot_dots[] =
@@ -141,6 +148,7 @@ static void boot_screen_run(void)
       usleep(16 * 1000);
     }
 }
+#endif
 
 /****************************************************************************
  * Public Functions
@@ -202,6 +210,7 @@ int main(int argc, FAR char *argv[])
       return 1;
     }
 
+#ifdef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
   /* Boot screen for about 3 seconds, then switch to the main UI */
 
   boot_screen_run();
@@ -218,6 +227,18 @@ int main(int argc, FAR char *argv[])
     {
       LV_LOG_WARN("camera module failed to start, continue without it");
     }
+#else
+  /* Default LVGL demo framework (no SignBridge UI configured) */
+
+  if (!lv_demos_create(&argv[1], argc - 1))
+    {
+      lv_demos_show_help();
+
+      /* we can add custom demos here */
+
+      goto demo_end;
+    }
+#endif
 
 #ifdef CONFIG_LV_USE_NUTTX_LIBUV
   lv_nuttx_uv_loop(&ui_loop, &result);
@@ -235,7 +256,9 @@ int main(int argc, FAR char *argv[])
     }
 #endif
 
+#ifndef CONFIG_EXAMPLES_LVGLDEMO_SIGNBRIDGE
 demo_end:
+#endif
   lv_nuttx_deinit(&result);
   lv_deinit();
 
