@@ -20,6 +20,12 @@
 
 include $(APPDIR)/Make.defs
 
+GENROMFS ?= genromfs
+
+ifneq ($(wildcard $(APPDIR)/../prebuilts/tools/linux/x86_64/genromfs),)
+GENROMFS := $(APPDIR)/../prebuilts/tools/linux/x86_64/genromfs
+endif
+
 # ROMFS built-in application info
 
 PROGNAME = romfs
@@ -34,7 +40,7 @@ MAINSRC = romfs_main.c
 # Common build
 
 checkgenromfs:
-	@genromfs -h 1>/dev/null 2>&1 || { \
+	@$(GENROMFS) -h 1>/dev/null 2>&1 || { \
  echo "Host executable genromfs not available in PATH"; \
  echo "You may need to download in from http://romfs.sourceforge.net/"; \
  exit 1; \
@@ -44,10 +50,14 @@ testdir : testdir.tar.gz
 	@tar zxf $< || { echo "tar zxf $< failed" ; exit 1 ; }
 
 testdir.img : checkgenromfs testdir
-	@genromfs -f $@ -d testdir -V "ROMFS_Test" || { echo "genromfs failed" ; exit 1 ; }
+	@$(GENROMFS) -f $@ -d testdir -V "ROMFS_Test" || \
+	  { echo "genromfs failed" ; exit 1 ; }
 
 romfs_testdir.h : testdir.img
-	@xxd -i $< >$@ || { echo "xxd of $< failed" ; exit 1 ; }
+	@xxd -i $< | sed \
+	  -e 's/^unsigned char /static const unsigned char /' \
+	  -e 's/^unsigned int /static const unsigned int /' >$@ || \
+	  { echo "xxd of $< failed" ; exit 1 ; }
 
 context:: romfs_testdir.h
 

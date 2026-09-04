@@ -736,6 +736,7 @@ static void drivertest_touchpanel(FAR void **state)
 
   lv_init();
   lv_nuttx_dsc_init(&info);
+  info.fb_path = "/dev/lcd0";
   lv_nuttx_init(&info, &result);
 
   if (result.disp == NULL)

@@ -20,7 +20,11 @@
 
 include $(APPDIR)/Make.defs
 
-CSRCS += $(filter-out aplay.c arecord.c, $(wildcard *.c))
+CSRCS += $(filter-out aplay.c arecord.c pcm_dmix.c, $(wildcard *.c))
+
+ifneq ($(CONFIG_AUDIOUTILS_ALSA_LIB_DEVICE_DMIX),)
+CSRCS += pcm_dmix.c
+endif
 
 CFLAGS += -DOUTSIDE_SPEEX -DRANDOM_PREFIX=nuttx
 

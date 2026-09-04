@@ -24,10 +24,13 @@ PRIORITY  = $(CONFIG_TESTING_DRIVER_TEST_PRIORITY)
 STACKSIZE = $(CONFIG_TESTING_DRIVER_TEST_STACKSIZE)
 MODULE    = $(CONFIG_TESTING_DRIVER_TEST)
 
-ifneq ($(CONFIG_TESTING_DRIVER_TEST_SIMPLE),)
-MAINSRC  += drivertest_simple.c
-PROGNAME += cmocka_driver_simple
-endif
+# Keep this target disabled for the ESP32-S3 LCD touch bring-up config.
+# It pulls in the generic driver smoke test, while this image only needs
+# the touchpanel app below.
+# ifneq ($(CONFIG_TESTING_DRIVER_TEST_SIMPLE),)
+# MAINSRC  += drivertest_simple.c
+# PROGNAME += cmocka_driver_simple
+# endif
 
 ifeq ($(CONFIG_BCH)$(CONFIG_BUILD_FLAT),yy)
 CFLAGS += ${INCDIR_PREFIX}${TOPDIR}/fs
@@ -158,7 +161,7 @@ MAINSRC  += drivertest_regulator.c
 PROGNAME += cmocka_driver_regulator
 endif
 
-ifneq ($(CONFIG_LV_USE_NUTTX_TOUCHSCREEN),)
+ifeq ($(CONFIG_GRAPHICS_LVGL)$(CONFIG_LV_USE_NUTTX_TOUCHSCREEN),yy)
 MAINSRC  += drivertest_touchpanel.c
 PROGNAME += cmocka_driver_touchpanel
 endif

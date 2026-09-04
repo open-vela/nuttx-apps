@@ -25,6 +25,7 @@
 #include <nuttx/config.h>
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <getopt.h>
 #include <net/if.h>
 #include <strings.h>
@@ -47,6 +48,8 @@
 #define IPERF_DEFAULT_PORT     5001
 #define IPERF_DEFAULT_INTERVAL 3
 #define IPERF_DEFAULT_TIME     30
+#define IPERF_MIN_BUFFER_LEN   16
+#define IPERF_MAX_BUFFER_LEN   (1 << 20)
 
 /****************************************************************************
  * Private Types
@@ -63,6 +66,7 @@ struct wifi_iperf_s
   int interval;
   int abort;
   int time;
+  uint32_t buffer_len;
 };
 
 /****************************************************************************
@@ -80,7 +84,7 @@ struct wifi_iperf_s
 static void iperf_showusage(FAR const char *progname)
 {
   printf("USAGE: %s [-sua] [-c <ip|cpu>] [-p <port>] [-i <interval>] "
-         "[-t <time>] [--local <path>] [--rpmsg <name>] "
+         "[-t <time>] [-l <length>] [--local <path>] [--rpmsg <name>] "
          "[--vsock <host/guest>]\n", progname);
   printf("iperf command:\n"
          "  -c, --client=<ip>    run in client mode, connecting to <host>\n"
@@ -95,6 +99,7 @@ static void iperf_showusage(FAR const char *progname)
          " reports\n"
          "  -t, --time=<time>    time in seconds to transmit for (default 10"
          " secs)\n"
+         "  -l, --len=<length>   buffer length in bytes\n"
          "  -a, --abort          abort running iperf\n");
 }
 
@@ -137,8 +142,8 @@ static void iperf_printcfg(FAR struct iperf_cfg_t *cfg)
              (cfg->dip >> 16) & 0xff, (cfg->dip >> 24) & 0xff, cfg->dport);
     }
 
-  printf("interval=%" PRId32 ", time=%" PRId32 "\n",
-         cfg->interval, cfg->time);
+  printf("interval=%" PRId32 ", time=%" PRId32 ", buffer=%" PRIu32 "\n",
+         cfg->interval, cfg->time, cfg->buffer_len);
 }
 
 /****************************************************************************
@@ -157,6 +162,7 @@ int main(int argc, FAR char *argv[])
     {"local", optional_argument, 0, 'L'},
     {"rpmsg", required_argument, 0, 'R'},
     {"vsock", required_argument, 0, 'V'},
+    {"len", required_argument, 0, 'l'},
     {0, 0, 0, 0}
   };
 
@@ -173,7 +179,8 @@ int main(int argc, FAR char *argv[])
   cfg.sport = IPERF_DEFAULT_PORT;
   cfg.dport = IPERF_DEFAULT_PORT;
 
-  while ((opt = getopt_long(argc, argv, "sua:c:B:p:i:t:",
+  optind = 1;
+  while ((opt = getopt_long(argc, argv, "sua:c:B:p:i:t:l:",
                             loptions, NULL)) != -1)
     {
       switch (opt)
@@ -203,6 +210,25 @@ int main(int argc, FAR char *argv[])
             break;
           case 't':
             iperf.time = strtoul(optarg, NULL, 0);
+            break;
+          case 'l':
+            {
+              FAR char *endptr;
+              unsigned long length;
+
+              errno = 0;
+              length = strtoul(optarg, &endptr, 0);
+              if (errno != 0 || *endptr != '\0' ||
+                  length < IPERF_MIN_BUFFER_LEN ||
+                  length > IPERF_MAX_BUFFER_LEN)
+                {
+                  printf("ERROR: buffer length must be %d..%d bytes\n",
+                         IPERF_MIN_BUFFER_LEN, IPERF_MAX_BUFFER_LEN);
+                  goto out;
+                }
+
+              iperf.buffer_len = length;
+            }
             break;
           case 'L':
             cfg.flag |= IPERF_FLAG_LOCAL;
@@ -338,6 +364,8 @@ int main(int argc, FAR char *argv[])
     {
       cfg.interval = iperf.interval;
     }
+
+  cfg.buffer_len = iperf.buffer_len;
 
   if (iperf.time == 0)
     {

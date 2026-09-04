@@ -122,6 +122,26 @@ struct node_s
     } u;
 };
 
+enum node_index_e
+{
+  NODE_ADIR,
+  NODE_AFILE,
+  NODE_LDIR,
+  NODE_HFILE,
+  NODE_ANOTHERFILE,
+  NODE_SUBDIR,
+  NODE_YAFILE,
+  NODE_SUBDIRFILE,
+  NODE_COUNT
+};
+
+struct romfs_state_s
+{
+  int nerrors;
+  struct node_s nodes[NODE_COUNT];
+  char scratchbuffer[SCRATCHBUFFER_SIZE];
+};
+
 /****************************************************************************
  * Private Data
  ****************************************************************************/
@@ -133,20 +153,18 @@ static const char g_subdirfilecontent[]  = "File in subdirectory\n";
 
 #define g_hfilecontent g_subdirfilecontent
 
-static struct node_s g_adir;
-static struct node_s g_afile;
-static struct node_s g_ldir;
-static struct node_s g_hfile;
+static struct romfs_state_s *g_state;
 
-static struct node_s g_anotherfile;
-static struct node_s g_subdir;
-static struct node_s g_yafile;
-
-static struct node_s g_subdirfile;
-
-static int g_nerrors = 0;
-
-static char g_scratchbuffer[SCRATCHBUFFER_SIZE];
+#define g_adir          g_state->nodes[NODE_ADIR]
+#define g_afile         g_state->nodes[NODE_AFILE]
+#define g_ldir          g_state->nodes[NODE_LDIR]
+#define g_hfile         g_state->nodes[NODE_HFILE]
+#define g_anotherfile   g_state->nodes[NODE_ANOTHERFILE]
+#define g_subdir        g_state->nodes[NODE_SUBDIR]
+#define g_yafile        g_state->nodes[NODE_YAFILE]
+#define g_subdirfile    g_state->nodes[NODE_SUBDIRFILE]
+#define g_nerrors       g_state->nerrors
+#define g_scratchbuffer g_state->scratchbuffer
 
 /****************************************************************************
  * Private Functions
@@ -493,6 +511,13 @@ int main(int argc, FAR char *argv[])
 
   /* Perform the test */
 
+  g_state = calloc(1, sizeof(*g_state));
+  if (g_state == NULL)
+    {
+      printf("ERROR: Failed to allocate ROMFS test state\n");
+      return 1;
+    }
+
   connectem();
   readdirectories(CONFIG_EXAMPLES_ROMFS_MOUNTPOINT, &g_adir);
   checkdirectories(&g_adir);
@@ -500,9 +525,15 @@ int main(int argc, FAR char *argv[])
   if (g_nerrors)
     {
       printf("Finished with  %d errors\n", g_nerrors);
-      return g_nerrors;
+      ret = g_nerrors;
+    }
+  else
+    {
+      printf("PASSED\n");
+      ret = 0;
     }
 
-  printf("PASSED\n");
-  return 0;
+  free(g_state);
+  g_state = NULL;
+  return ret;
 }

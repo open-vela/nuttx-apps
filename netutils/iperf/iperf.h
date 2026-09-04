@@ -66,6 +66,7 @@ struct iperf_cfg_t
   uint16_t sport;
   uint32_t interval;
   uint32_t time;
+  uint32_t buffer_len;
   uint32_t cid;         /* vsock cid */
   FAR const char *host; /* host name (dip) or rpmsg cpu */
   FAR const char *path; /* local path or rpmsg name */

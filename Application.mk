@@ -309,6 +309,8 @@ $(foreach BATCH, $(OBJS_SPILT_TOTAL), \
 )
 endif
 
+.PHONY: $(PREFIX).built
+
 $(PREFIX).built: $(AROBJS)
 	$(call SPLITVARIABLE,ALL_OBJS,$(AROBJS),100)
 	$(foreach BATCH, $(ALL_OBJS_TOTAL), \

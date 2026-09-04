@@ -21,12 +21,15 @@
 ifneq ($(CONFIG_CRYPTO_MBEDTLS),)
 CONFIGURED_APPS += $(APPDIR)/crypto/mbedtls
 
-# Allows `<mbedtls/<>.h>` import.
+# Allows `<mbedtls/<>.h>` import.  Keep these application-provided headers
+# behind architecture-specific include directories.  Some wireless targets
+# build a vendor Mbed TLS port in the architecture library and must use the
+# matching vendor headers rather than this separately versioned copy.
 
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/include
-CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/mbedtls/include
+CFLAGS += -idirafter $(APPDIR)/crypto/mbedtls/include
+CFLAGS += -idirafter $(APPDIR)/crypto/mbedtls/mbedtls/include
 
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/include
-CXXFLAGS += ${INCDIR_PREFIX}$(APPDIR)/crypto/mbedtls/mbedtls/include
+CXXFLAGS += -idirafter $(APPDIR)/crypto/mbedtls/include
+CXXFLAGS += -idirafter $(APPDIR)/crypto/mbedtls/mbedtls/include
 
 endif

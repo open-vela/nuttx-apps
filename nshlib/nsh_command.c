@@ -24,12 +24,18 @@
 
 #include <nuttx/config.h>
 
+#include <sys/wait.h>
+
+#include <errno.h>
+#include <sched.h>
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
 
 #ifdef CONFIG_NSH_BUILTIN_APPS
+#  include <nuttx/arch.h>
 #  include <nuttx/lib/builtin.h>
+#  include <nuttx/sched.h>
 #endif
 
 #if defined(CONFIG_SYSTEM_READLINE) && defined(CONFIG_READLINE_HAVE_EXTMATCH)
@@ -73,6 +79,78 @@ struct cmdmap_s
   FAR const char *usage;  /* Usage instructions for 'help' command */
 #endif
 };
+
+#ifdef CONFIG_NSH_BUILTIN_AS_COMMAND
+static int nsh_builtin_command(FAR struct nsh_vtbl_s *vtbl,
+                               FAR const struct builtin_s *builtin,
+                               int argc, FAR char *argv[])
+{
+  FAR struct tcb_s *tcb;
+  uintptr_t stack_base;
+  uintptr_t stack_pointer;
+  size_t stack_available;
+  pid_t pid;
+  int status;
+  int ret;
+
+  tcb = this_task();
+  stack_base = (uintptr_t)tcb->stack_base_ptr;
+  stack_pointer = up_getsp();
+  stack_available = stack_pointer > stack_base ?
+                    stack_pointer - stack_base : 0;
+
+  if ((size_t)builtin->stacksize <= stack_available)
+    {
+      return builtin->main(argc, argv);
+    }
+
+  pid = task_create(builtin->name, builtin->priority, builtin->stacksize,
+                    builtin->main, argc > 1 ? &argv[1] : NULL);
+  if (pid < 0)
+    {
+      nsh_error(vtbl, g_fmtcmdfailed, builtin->name,
+                "task_create", NSH_ERRNO);
+      return ERROR;
+    }
+
+  vtbl->np.np_lastpid = pid;
+
+#ifdef CONFIG_SCHED_WAITPID
+#  ifndef CONFIG_NSH_DISABLEBG
+  if (!vtbl->np.np_bg)
+#  endif
+    {
+      status = 0;
+      ret = waitpid(pid, &status, WUNTRACED);
+      if (ret < 0)
+        {
+          if (errno == ECHILD)
+            {
+              return OK;
+            }
+
+          nsh_error(vtbl, g_fmtcmdfailed, builtin->name,
+                    "waitpid", NSH_ERRNO);
+          return ERROR;
+        }
+
+      return status == 0 ? OK : 1;
+    }
+#endif
+
+#if !defined(CONFIG_SCHED_WAITPID) || !defined(CONFIG_NSH_DISABLEBG)
+  {
+    struct sched_param sched;
+
+    sched_getparam(pid, &sched);
+    nsh_output(vtbl, "%s [%d:%d]\n", builtin->name, pid,
+               sched.sched_priority);
+  }
+#endif
+
+  return OK;
+}
+#endif
 
 /****************************************************************************
  * Private Function Prototypes
@@ -1269,14 +1347,15 @@ int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
 
   index = builtin_isavail(cmd);
 
-  if (index > 0)
+  if (index >= 0)
     {
       /* Get the builtin structure by index */
 
       builtin = builtin_for_index(index);
       if (builtin != NULL)
         {
-          return (builtin->main)(argc, (FAR char **)argv);
+          return nsh_builtin_command(vtbl, builtin, argc,
+                                     (FAR char **)argv);
         }
     }
 #endif
