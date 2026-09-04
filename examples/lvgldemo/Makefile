@@ -28,5 +28,7 @@ MODULE = $(CONFIG_EXAMPLES_LVGLDEMO)
 # LVGL demo Example
 
 MAINSRC = lvgldemo.c
+CSRCS += ui_main.c boot_screen.c audio_beep.c camera_module.c
+CSRCS += zh_font_16.c zh_font_40.c logo_data.c
 
 include $(APPDIR)/Application.mk

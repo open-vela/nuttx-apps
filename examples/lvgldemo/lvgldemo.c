@@ -32,6 +32,10 @@
 #include <uv.h>
 #endif
 
+#include "boot_screen.h"
+#include "ui_main.h"
+#include "camera_module.h"
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/
@@ -60,6 +64,11 @@
 /****************************************************************************
  * Private Data
  ****************************************************************************/
+
+/* 338 官方板级 (esp32p4_bringup.c) 的 LVGL 看门狗引用此心跳计数，由 demo
+ * 主循环每轮递增。官方公开仓未随板级发布配套定义，这里补齐符号。
+ */
+volatile uint32_t g_lvgl_heartbeat = 0;
 
 /****************************************************************************
  * Private Functions
@@ -151,13 +160,39 @@ int main(int argc, FAR char *argv[])
       return 1;
     }
 
-  if (!lv_demos_create(&argv[1], argc - 1))
+  /* 开机界面：白底 openvela logo + 底部进度条，约 3 秒。
+   * 期间必须持续调用 lv_timer_handler() 渲染，进度条才会动。
+   */
+  boot_screen_show(lv_screen_active());
+
+#define BOOT_DURATION_MS 3000u
+  {
+    static const char *const boot_dots[] =
     {
-      lv_demos_show_help();
+      "正在启动", "正在启动.", "正在启动..", "正在启动...",
+    };
+    uint32_t t0 = lv_tick_get();
 
-      /* we can add custom demos here */
+    while (lv_tick_get() - t0 < BOOT_DURATION_MS)
+      {
+        uint32_t dt = lv_tick_get() - t0;
+        int pct = (int)((dt * 100u) / BOOT_DURATION_MS);
 
-      goto demo_end;
+        boot_screen_update(pct, boot_dots[(dt / 300u) % 4]);
+
+        lv_timer_handler();
+        g_lvgl_heartbeat++;
+        usleep(16 * 1000);
+      }
+  }
+
+  /* 进入手语识别主界面（浅色卡片布局） */
+  ui_main_create(lv_screen_active());
+
+  /* 启动摄像头：SC2336 初始化 + CSI 取帧显示到预览 canvas */
+  if (camera_module_start(ui_main_get_camera_canvas()) != 0)
+    {
+      LV_LOG_WARN("camera module failed to start, continue without it");
     }
 
 #ifdef CONFIG_LV_USE_NUTTX_LIBUV
@@ -167,6 +202,7 @@ int main(int argc, FAR char *argv[])
     {
       uint32_t idle;
       idle = lv_timer_handler();
+      g_lvgl_heartbeat++;
 
       /* Minimum sleep of 1ms */
 
