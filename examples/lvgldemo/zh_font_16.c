@@ -5386,7 +5386,7 @@ static LV_ATTRIBUTE_LARGE_CONST const uint8_t glyph_bitmap[] =
 };
 
 /****************************************************************************
- * Public Functions
+ * Private Data
  ****************************************************************************/
 
 static const lv_font_fmt_txt_glyph_dsc_t glyph_dsc[] =
@@ -7229,7 +7229,7 @@ static const lv_font_fmt_txt_dsc_t font_dsc =
 extern const lv_font_t lv_font_montserrat_16;
 
 /****************************************************************************
- * Private Data
+ * Public Data
  ****************************************************************************/
 
 /* Initialize a public general font descriptor */
