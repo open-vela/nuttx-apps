@@ -2792,7 +2792,10 @@
  *            a security risk. We recommend considering stronger ciphers
  *instead.
  */
+/* DES/3DES are not used by the TLS1.2 client on this port; disable. */
+#ifdef CONFIG_MBEDTLS_DES_C
 #define MBEDTLS_DES_C
+#endif
 
 /**
  * \def MBEDTLS_DHM_C
@@ -3118,7 +3121,9 @@
  *            it, and considering stronger message digests instead.
  *
  */
+#ifdef CONFIG_MBEDTLS_MD5_C
 #define MBEDTLS_MD5_C
+#endif
 
 /**
  * \def MBEDTLS_MEMORY_BUFFER_ALLOC_C
@@ -3513,6 +3518,8 @@
  *            avoiding dependencies on it, and considering stronger
  *            message digests instead.
  */
+/* SHA-1 is required for the WebSocket handshake (RFC 6455
+ * Sec-WebSocket-Accept), so keep it unconditionally enabled. */
 #define MBEDTLS_SHA1_C
 
 /**

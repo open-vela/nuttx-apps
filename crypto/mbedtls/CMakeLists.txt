@@ -134,14 +134,12 @@ if(CONFIG_CRYPTO_MBEDTLS)
   # Library Configuration
   # ############################################################################
 
-  set_property(
-    TARGET nuttx
-    APPEND
-    PROPERTY NUTTX_INCLUDE_DIRECTORIES ${INCDIR})
-  set_property(
-    TARGET nuttx
-    APPEND
-    PROPERTY NUTTX_CXX_INCLUDE_DIRECTORIES ${INCDIR})
+  # openvela fix: do NOT inject the mbedtls include dirs into the global
+  # NUTTX_INCLUDE_DIRECTORIES - that leaks them into every arch library
+  # compile unit (e.g. esp-hal bootloader_sha.c) where they collide with
+  # the ESP-HAL mbedtls copy (MBEDTLS_PRIVATE redefined, check_config
+  # failures).  Consumers that need mbedtls headers add them explicitly.
+
 
   nuttx_add_kernel_library(mbedtls SPLIT)
   target_sources(mbedtls PRIVATE ${CSRCS})
@@ -151,6 +149,10 @@ if(CONFIG_CRYPTO_MBEDTLS)
   if(CONFIG_ARCH_SIM)
     target_compile_options(mbedtls PRIVATE -O0)
   endif()
+
+  # Trimmed mbedTLS configs leave optional feature macros undefined; the
+  # library guards them with `#if FOO == 0`, which trips -Wundef -Werror.
+  target_compile_options(mbedtls PRIVATE -Wno-undef)
 
   # ############################################################################
   # Applications Configuration

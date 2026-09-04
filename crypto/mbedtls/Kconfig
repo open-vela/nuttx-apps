@@ -150,6 +150,21 @@ config MBEDTLS_ECP_C
 	bool "Enable the elliptic curve over GF(p) library."
 	default y
 
+# mbedTLS 3.x symbols missing from this Kconfig.  Without them check_config.h
+# fails on MBEDTLS_ECJPAKE_C / KEY_EXCHANGE_* prerequisites (used by ai_agent
+# HTTPS).  These match the upstream mbedtls 3.x defaults.
+config MBEDTLS_MD_C
+	bool "Enable the generic message digest layer."
+	default y
+
+config MBEDTLS_RSA_C
+	bool "Enable the RSA public-key cryptosystem."
+	default y
+
+config MBEDTLS_X509_CRT_PARSE_C
+	bool "Enable X.509 certificate parsing."
+	default y
+
 config MBEDTLS_ECP_DP_SECP256R1_ENABLED
 	bool "Enables specific curves within the Elliptic Curve module."
 	default y
