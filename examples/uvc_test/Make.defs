@@ -1,0 +1,3 @@
+ifneq ($(CONFIG_EXAMPLES_UVC_TEST),)
+CONFIGURED_APPS += $(APPDIR)/examples/uvc_test
+endif

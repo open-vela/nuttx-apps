@@ -1,0 +1,36 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_PERSON_DETECTION
+	tristate "Person Detection example (TFLite Micro)"
+	default n
+	depends on TFLITEMICRO
+	---help---
+		Person detection demo using TensorFlow Lite Micro.
+		Runs a MobileNet V1 based INT8 quantized model (96x96 grayscale)
+		to detect whether a person is present in an image.
+
+if EXAMPLES_PERSON_DETECTION
+
+config EXAMPLES_PERSON_DETECTION_PROGNAME
+	string "Program name"
+	default "person_detection"
+	---help---
+		This is the name of the program that will be used when the NSH ELF
+		program is installed.
+
+config EXAMPLES_PERSON_DETECTION_PRIORITY
+	int "Person Detection task priority"
+	default 100
+
+config EXAMPLES_PERSON_DETECTION_STACKSIZE
+	int "Person Detection task stack size"
+	default 32768
+	---help---
+		Stack size must be large enough for the TFLite Micro tensor arena
+		(136KB) plus model inference overhead. Default 16KB is for the
+		task stack only; the tensor arena is allocated as a static global.
+
+endif

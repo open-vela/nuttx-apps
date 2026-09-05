@@ -1,0 +1,45 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_FACE_DETECTION
+	tristate "Frontal Face Detection example (TFLite Micro)"
+	default n
+	depends on TFLITEMICRO
+	---help---
+		Frontal face detection demo using TensorFlow Lite Micro.
+		Runs a MediaPipe BlazeFace short-range INT8 model (128x128 RGB,
+		SSD with 896 anchors + 6 face keypoints) and reports whether a
+		face is squarely facing the camera, judged from the eye and nose
+		keypoints.
+
+if EXAMPLES_FACE_DETECTION
+
+config EXAMPLES_FACE_DETECTION_PROGNAME
+	string "Program name"
+	default "face_detection"
+	---help---
+		This is the name of the program that will be used when the NSH ELF
+		program is installed.
+
+config EXAMPLES_FACE_DETECTION_PRIORITY
+	int "Face Detection task priority"
+	default 100
+
+config EXAMPLES_FACE_DETECTION_STACKSIZE
+	int "Face Detection task stack size"
+	default 32768
+	---help---
+		Task stack size. The TFLite Micro tensor arena is a static global,
+		not on the stack, so this only covers the task itself.
+
+config EXAMPLES_FACE_DETECTION_ARENA_SIZE
+	int "TFLite Micro tensor arena size (bytes)"
+	default 524288
+	---help---
+		Size of the static tensor arena for the BlazeFace model. The app
+		prints arena_used_bytes at startup; tune this down to the reported
+		value (rounded up) to save RAM, or up if AllocateTensors fails.
+
+endif
