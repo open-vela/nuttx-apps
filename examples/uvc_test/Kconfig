@@ -1,0 +1,35 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_UVC_TEST
+	bool "USB Camera (UVC) Test"
+	default n
+	depends on DRIVERS_VIDEO
+	---help---
+		Enable the USB Camera (UVC) test application.
+		This application tests basic video capture functionality
+		from a USB camera device.
+
+if EXAMPLES_UVC_TEST
+
+config EXAMPLES_UVC_TEST_PROGNAME
+	string "Program name"
+	default "uvc_test"
+	---help---
+		Name of the UVC test application.
+
+config EXAMPLES_UVC_TEST_PRIORITY
+	int "UVC test task priority"
+	default 100
+	---help---
+		Priority of the UVC test task.
+
+config EXAMPLES_UVC_TEST_STACKSIZE
+	int "UVC test task stack size"
+	default 8192
+	---help---
+		Stack size for the UVC test task.
+
+endif # EXAMPLES_UVC_TEST
