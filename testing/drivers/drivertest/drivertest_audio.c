@@ -620,7 +620,8 @@ out_release:
   if (reserved)
     {
 #ifdef CONFIG_AUDIO_MULTI_SESSION
-      ioctl(state->outdev_fd, AUDIOIOC_RELEASE, (unsigned long)state->session);
+      ioctl(state->outdev_fd, AUDIOIOC_RELEASE,
+            (unsigned long)state->session);
 #else
       ioctl(state->outdev_fd, AUDIOIOC_RELEASE, 0);
 #endif
@@ -1209,7 +1210,8 @@ static void drivertest_audio(void **audio_state)
       if (ret < 0)
         {
           syslog(LOG_ERR,
-                 "audio_test_prepare failed direct=%d ret=%d errno=%d file=%s indev=%s outdev=%s\n",
+                 "audio_test_prepare failed direct=%d ret=%d errno=%d"
+                 " file=%s indev=%s outdev=%s\n",
                  direct, ret, errno, state->outfile, state->indev,
                  state->outdev);
         }
@@ -1365,7 +1367,9 @@ static void drivertest_audio(void **audio_state)
         {
           gettimeofday(&now, NULL);
           timersub(&now, &start, &elapsed);
-          syslog(LOG_INFO, "Capture elapsed %ld.%06ld sec target=%" PRIu32 "\n",
+          syslog(LOG_INFO,
+                 "Capture elapsed %ld.%06ld sec target=%" PRIu32
+                 "\n",
                  (long)elapsed.tv_sec, (long)elapsed.tv_usec,
                  state->duration);
           assert_true(elapsed.tv_sec >= state->duration);

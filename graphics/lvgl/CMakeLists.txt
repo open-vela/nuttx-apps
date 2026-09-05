@@ -60,12 +60,8 @@ if(CONFIG_GRAPHICS_LVGL)
   # Library Configuration
   # ############################################################################
 
-  file(
-    GLOB_RECURSE
-    SRCS
-    "${LVGL_DIR}/src/*.S"
-    "${LVGL_DIR}/src/*.c"
-    "${LVGL_DIR}/src/*.cpp")
+  file(GLOB_RECURSE SRCS "${LVGL_DIR}/src/*.S" "${LVGL_DIR}/src/*.c"
+       "${LVGL_DIR}/src/*.cpp")
 
   list(APPEND SRCS "${LVGL_DIR}/demos/lv_demos.c")
 

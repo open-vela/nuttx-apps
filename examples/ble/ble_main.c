@@ -39,6 +39,7 @@ extern void setup_ble(void);
 int main(int argc, FAR char *argv[])
 {
   setup_ble();
-  printf("ble echo ready: advertise, connect, read/write/notify in nRF Connect\n");
+  printf("ble echo ready: advertise, connect, read/write/notify in"
+         " nRF Connect\n");
   return 0;
 }
