@@ -251,6 +251,8 @@ static void draw_rect(FAR struct lcd_info_s *lcd_info, int x, int y,
   const uint8_t bpp = lcd_info->plane_info.bpp;
   const uint32_t xres = lcd_info->video_info.xres;
   const uint32_t yres = lcd_info->video_info.yres;
+  uint32_t area_w;
+  uint32_t area_h;
   struct lcddev_area_s draw_area;
 
   memset(&draw_area, 0, sizeof(draw_area));
@@ -271,12 +273,15 @@ static void draw_rect(FAR struct lcd_info_s *lcd_info, int x, int y,
   draw_rect_buf_alloc(lcd_info, &draw_area);
   assert_ptr_not_equal(draw_area.data, NULL);
 
+  area_w = draw_area.col_end - draw_area.col_start + 1;
+  area_h = draw_area.row_end - draw_area.row_start + 1;
+
   fb_bpp16 = (uint16_t *)draw_area.data;
   fb_bpp32 = (uint32_t *)draw_area.data;
-  for (j = 0; j <= (draw_area.row_end - draw_area.row_start); j++)
+  for (j = 0; j < area_h; j++)
     {
-      offset = j  * valid_w;
-      for (i = 0; i <= (draw_area.col_end - draw_area.col_start); i++)
+      offset = j * area_w;
+      for (i = 0; i < area_w; i++)
         {
           if (bpp == 32)
             {
@@ -290,6 +295,59 @@ static void draw_rect(FAR struct lcd_info_s *lcd_info, int x, int y,
     }
 
   ret = ioctl(lcd_info->fd, LCDDEVIO_PUTAREA, (unsigned long)&draw_area);
+  assert_int_equal(ret, 0);
+  free(draw_area.data);
+}
+
+/****************************************************************************
+ * Name: draw_vertical_gradient
+ ****************************************************************************/
+
+static void draw_vertical_gradient(FAR struct lcd_info_s *lcd_info)
+{
+  uint32_t col;
+  uint32_t row;
+  uint32_t gray;
+  uint32_t color;
+  int ret;
+  FAR uint16_t *fb_bpp16;
+  FAR uint32_t *fb_bpp32;
+  const uint8_t bpp = lcd_info->plane_info.bpp;
+  const uint32_t xres = lcd_info->video_info.xres;
+  const uint32_t yres = lcd_info->video_info.yres;
+  struct lcddev_area_s draw_area;
+
+  memset(&draw_area, 0, sizeof(draw_area));
+  draw_area.row_end = yres - 1;
+  draw_area.col_end = xres - 1;
+  draw_rect_buf_alloc(lcd_info, &draw_area);
+  assert_ptr_not_equal(draw_area.data, NULL);
+
+  fb_bpp16 = (FAR uint16_t *)draw_area.data;
+  fb_bpp32 = (FAR uint32_t *)draw_area.data;
+  for (row = 0; row < yres; row++)
+    {
+      gray = yres > 1 ? (row * 0xff) / (yres - 1) : 0;
+      color = (gray << 16) | (gray << 8) | gray;
+
+      for (col = 0; col < xres; col++)
+        {
+          if (bpp == 32)
+            {
+              fb_bpp32[row * xres + col] = color;
+            }
+          else if (bpp == 16)
+            {
+              fb_bpp16[row * xres + col] = COLOR_888_TO_565(color);
+            }
+        }
+    }
+
+  printf("LCD grayscale v3: PUTAREA native RGB565 %" PRIu32 "x%" PRIu32
+         " bpp=%u\n", xres, yres, bpp);
+
+  ret = ioctl(lcd_info->fd, LCDDEVIO_PUTAREA,
+              (unsigned long)&draw_area);
   assert_int_equal(ret, 0);
   free(draw_area.data);
 }
@@ -337,7 +395,7 @@ static void drivertest_lcd_cross(FAR void **state)
   int step_num = 0;
   uint32_t colors_to_show[] =
     {
-      0x00000000, 0x00ff0000, 0x0000ff00, 0x000000ff, 0x00ffffff
+      RGB24_BLACK, RGB24_RED, RGB24_GREEN, RGB24_BLUE, RGB24_WHITE
     };
 
   const uint32_t xres = lcd_state->lcd_info.video_info.xres;
@@ -365,28 +423,8 @@ static void drivertest_lcd_cross(FAR void **state)
 static void drivertest_lcd_vertical(FAR void **state)
 {
   FAR struct lcd_state_s * lcd_state = (struct lcd_state_s *)*state;
-  int i = 0;
-  int start_y = 0;
-  int step_height = 0;
-  int step_num = 8;
-  uint32_t gray_color = 0;
 
-  const uint32_t xres = lcd_state->lcd_info.video_info.xres;
-  const uint32_t yres = lcd_state->lcd_info.video_info.yres;
-
-  step_height = yres / step_num;
-  for (i = 0; i < step_num; i++)
-    {
-      start_y = step_height * i;
-      if (i == step_num - 1)
-        {
-          step_height = yres - start_y;
-        }
-
-      gray_color = (0xff / step_num) * i;
-      draw_rect(&lcd_state->lcd_info, 0, start_y, xres, step_height,
-                  gray_color << 16 | gray_color << 8 | gray_color);
-    }
+  draw_vertical_gradient(&lcd_state->lcd_info);
 }
 
 /****************************************************************************

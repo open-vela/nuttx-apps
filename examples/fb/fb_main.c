@@ -515,7 +515,7 @@ static void draw_rect(FAR struct fb_state_s *state,
 int main(int argc, FAR char *argv[])
 {
   FAR const char *fbdev = g_default_fbdev;
-  struct fb_state_s state;
+  struct fb_state_s state = {0};
   struct fb_area_s area;
   int nsteps;
   int xstep;
@@ -709,7 +709,10 @@ int main(int argc, FAR char *argv[])
   ret = EXIT_SUCCESS;
 
   munmap(state.fbmem, state.pinfo.fblen);
-  munmap(state.fbmem2, state.pinfo.fblen);
+  if (state.fbmem2 != NULL)
+    {
+      munmap(state.fbmem2, state.pinfo.fblen);
+    }
   close(state.fd);
   return ret;
 }

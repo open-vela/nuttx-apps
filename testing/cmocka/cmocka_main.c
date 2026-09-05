@@ -35,9 +35,12 @@
 #include <syslog.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
-#include <nuttx/lib/builtin.h>
 #include <regex.h>
 #include <cmocka.h>
+
+#undef main
+
+#include <nuttx/lib/builtin.h>
 
 /****************************************************************************
  * Public Functions
@@ -92,9 +95,9 @@ static int cm_regexmatch(FAR const char *pattern, FAR const char *str)
  * cmocka_main
  ****************************************************************************/
 
-int main(int argc, FAR char *argv[])
+int cmocka_main(int argc, FAR char *argv[])
 {
-  const char prefix[] = CONFIG_TESTING_CMOCKA_PROGNAME"_";
+  const char prefix[] = "cmocka_";
   int prefix_len  = strlen(prefix);
   FAR char *testcase = NULL;
   FAR char *bypass[argc + 1];
