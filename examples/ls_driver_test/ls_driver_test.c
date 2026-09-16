@@ -38,12 +38,14 @@ static void show_usage(FAR const char *progname)
   printf("Usage: %s [test]\n", progname);
   printf("  test options:\n");
   printf("    led       - Test LED (GPIO%d, active-low)\n", LED_GPIO_PIN);
+  printf("    oled      - Test SSD1306 OLED (I2C1, addr=0x3C)\n");
   printf("    key       - Test Key (GPIO%d)\n", KEY_GPIO_PIN);
   printf("    thermal   - Test thermal sensor\n");
   printf("    pwm       - PWM2 breathing LED (GPIO88)\n");
   printf("    watchdog  - Test watchdog timer\n");
   printf("    rtc       - Test RTC (real-time clock)\n");
   printf("    adc       - Test ADC (analog-to-digital)\n");
+  printf("    sensor    - BH1750+OLED light sensor display\n");
   printf("    all       - Run all tests (default)\n");
 }
 
@@ -63,6 +65,14 @@ int main(int argc, FAR char *argv[])
           test_led();
 #else
           printf("GPIO and Pinctrl drivers not enabled\n");
+#endif
+        }
+      else if (strcmp(argv[1], "oled") == 0)
+        {
+#ifdef CONFIG_I2C_DRIVER
+          test_oled();
+#else
+          printf("I2C driver not enabled\n");
 #endif
         }
       else if (strcmp(argv[1], "key") == 0)
@@ -113,6 +123,14 @@ int main(int argc, FAR char *argv[])
           printf("ADC driver not enabled\n");
 #endif
         }
+      else if (strcmp(argv[1], "sensor") == 0)
+        {
+#ifdef CONFIG_I2C_DRIVER
+          test_sensor_oled();
+#else
+          printf("I2C driver not enabled\n");
+#endif
+        }
       else if (strcmp(argv[1], "-h") == 0 ||
                strcmp(argv[1], "--help") == 0)
         {
@@ -129,6 +147,10 @@ int main(int argc, FAR char *argv[])
 #if defined(CONFIG_LS2K0300_GPIO) && defined(CONFIG_LS2K0300_PINCTRL)
       test_led();
       test_key();
+#endif
+
+#ifdef CONFIG_I2C_DRIVER
+      test_oled();
 #endif
 
 #ifdef CONFIG_LS2K0300_THERMAL
