@@ -8,7 +8,8 @@ MODULE    = $(CONFIG_EXAMPLES_LS_DRIVER_TEST)
 
 MAINSRC = ls_driver_test.c
 
-CSRCS = test_common.c test_led.c test_key.c test_thermal.c test_pwm.c \
-        test_watchdog.c test_rtc.c test_adc.c
+CSRCS = test_common.c test_led.c test_oled.c test_key.c test_thermal.c \
+        test_pwm.c test_watchdog.c test_rtc.c test_adc.c \
+        test_sensor_oled.c
 
 include $(APPDIR)/Application.mk
