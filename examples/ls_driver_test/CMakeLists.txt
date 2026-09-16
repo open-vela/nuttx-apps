@@ -26,5 +26,6 @@ if(CONFIG_EXAMPLES_LS_DRIVER_TEST)
     test_watchdog.c
     test_rtc.c
     test_adc.c
-    test_sensor_oled.c)
+    test_sensor_oled.c
+    test_eeprom.c)
 endif()

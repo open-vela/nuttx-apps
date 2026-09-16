@@ -46,6 +46,7 @@ static void show_usage(FAR const char *progname)
   printf("    rtc       - Test RTC (real-time clock)\n");
   printf("    adc       - Test ADC (analog-to-digital)\n");
   printf("    sensor    - BH1750+OLED light sensor display\n");
+  printf("    eeprom    - EEPROM + BH1750 light sensor test\n");
   printf("    all       - Run all tests (default)\n");
 }
 
@@ -129,6 +130,15 @@ int main(int argc, FAR char *argv[])
           test_sensor_oled();
 #else
           printf("I2C driver not enabled\n");
+#endif
+        }
+      else if (strcmp(argv[1], "eeprom") == 0)
+        {
+#if defined(CONFIG_I2C_DRIVER) && defined(CONFIG_LS2K0300_GPIO) && \
+    defined(CONFIG_LS2K0300_PINCTRL)
+          test_eeprom();
+#else
+          printf("I2C, GPIO, and Pinctrl drivers not all enabled\n");
 #endif
         }
       else if (strcmp(argv[1], "-h") == 0 ||
