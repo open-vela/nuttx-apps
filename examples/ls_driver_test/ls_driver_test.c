@@ -48,6 +48,7 @@ static void show_usage(FAR const char *progname)
   printf("    sensor    - BH1750+OLED light sensor display\n");
   printf("    eeprom    - EEPROM + BH1750 light sensor test\n");
   printf("    buzzer    - Buzzer (GPIO%d) with KEY control\n", 75);
+  printf("    spiflash  - SPI Flash + ADC (KEY1: read/save, KEY2: exit)\n");
   printf("    all       - Run all tests (default)\n");
 }
 
@@ -148,6 +149,15 @@ int main(int argc, FAR char *argv[])
           test_buzzer();
 #else
           printf("GPIO and Pinctrl drivers not enabled\n");
+#endif
+        }
+      else if (strcmp(argv[1], "spiflash") == 0)
+        {
+#if defined(CONFIG_LS2K0300_SPIIO) && defined(CONFIG_LS2K0300_GPIO) && \
+    defined(CONFIG_LS2K0300_PINCTRL)
+          test_spiflash();
+#else
+          printf("SPIIO, GPIO, and Pinctrl drivers not all enabled\n");
 #endif
         }
       else if (strcmp(argv[1], "-h") == 0 ||
