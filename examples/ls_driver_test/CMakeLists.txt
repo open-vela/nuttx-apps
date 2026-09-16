@@ -29,5 +29,6 @@ if(CONFIG_EXAMPLES_LS_DRIVER_TEST)
     test_sensor_oled.c
     test_eeprom.c
     test_buzzer.c
-    test_spiflash.c)
+    test_spiflash.c
+    test_uart2.c)
 endif()
