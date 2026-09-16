@@ -1,0 +1,29 @@
+config EXAMPLES_LS_DRIVER_TEST
+	tristate "Loongson Driver Test"
+	default n
+	---help---
+		Enable the Loongson driver test application
+
+if EXAMPLES_LS_DRIVER_TEST
+
+config EXAMPLES_LS_DRIVER_TEST_PROGNAME
+	string "Program name"
+	default "ls_driver_test"
+	---help---
+		This is the name of the program that will be used when the NSH ELF
+		program is installed.
+
+config EXAMPLES_LS_DRIVER_TEST_PRIORITY
+	int "Test task priority"
+	default 100
+
+config EXAMPLES_LS_DRIVER_TEST_STACKSIZE
+	int "Test stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+config EXAMPLES_LS_DRIVER_TEST_HEAPSIZE
+	int "Test heap size"
+	depends on MM_TASK_HEAP
+	default MM_TASK_HEAP_DEFAULT_SIZE
+
+endif
