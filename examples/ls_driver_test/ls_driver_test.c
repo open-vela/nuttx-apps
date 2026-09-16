@@ -47,6 +47,7 @@ static void show_usage(FAR const char *progname)
   printf("    adc       - Test ADC (analog-to-digital)\n");
   printf("    sensor    - BH1750+OLED light sensor display\n");
   printf("    eeprom    - EEPROM + BH1750 light sensor test\n");
+  printf("    buzzer    - Buzzer (GPIO%d) with KEY control\n", 75);
   printf("    all       - Run all tests (default)\n");
 }
 
@@ -139,6 +140,14 @@ int main(int argc, FAR char *argv[])
           test_eeprom();
 #else
           printf("I2C, GPIO, and Pinctrl drivers not all enabled\n");
+#endif
+        }
+      else if (strcmp(argv[1], "buzzer") == 0)
+        {
+#if defined(CONFIG_LS2K0300_GPIO) && defined(CONFIG_LS2K0300_PINCTRL)
+          test_buzzer();
+#else
+          printf("GPIO and Pinctrl drivers not enabled\n");
 #endif
         }
       else if (strcmp(argv[1], "-h") == 0 ||
