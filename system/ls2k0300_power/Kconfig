@@ -1,0 +1,59 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config SYSTEM_LS2K0300_POWER
+	bool "LS2K0300 power management commands"
+	default n
+	depends on ARCH_LOONGARCH
+	---help---
+		Enable LS2K0300 specific power management commands (reboot/poweroff)
+
+if SYSTEM_LS2K0300_POWER
+
+config SYSTEM_LS2K0300_REBOOT
+	bool "LS2K0300 reboot command"
+	default y
+	---help---
+		Enable the reboot command for LS2K0300 board.
+		This command writes 1 to register 0x16124000 to trigger reboot.
+
+config SYSTEM_LS2K0300_REBOOT_PROGNAME
+	string "Reboot program name"
+	default "reboot"
+	---help---
+		This is the name of the program that will be used when the NSH
+		program is installed.
+
+config SYSTEM_LS2K0300_REBOOT_PRIORITY
+	int "Reboot task priority"
+	default 100
+
+config SYSTEM_LS2K0300_REBOOT_STACKSIZE
+	int "Reboot stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+config SYSTEM_LS2K0300_POWEROFF
+	bool "LS2K0300 poweroff command"
+	default y
+	---help---
+		Enable the poweroff command for LS2K0300 board.
+		This command writes 0x3c00 to register 0x16124000+0x14 to power off.
+
+config SYSTEM_LS2K0300_POWEROFF_PROGNAME
+	string "Poweroff program name"
+	default "poweroff"
+	---help---
+		This is the name of the program that will be used when the NSH
+		program is installed.
+
+config SYSTEM_LS2K0300_POWEROFF_PRIORITY
+	int "Poweroff task priority"
+	default 100
+
+config SYSTEM_LS2K0300_POWEROFF_STACKSIZE
+	int "Poweroff stack size"
+	default DEFAULT_TASK_STACKSIZE
+
+endif
