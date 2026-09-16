@@ -52,5 +52,6 @@ int test_sensor_oled(void);
 int test_eeprom(void);
 int test_buzzer(void);
 int test_spiflash(void);
+int test_uart2(void);
 
 #endif /* __APPS_EXAMPLES_LS_DRIVER_TEST_H */
