@@ -118,6 +118,24 @@ config NETINIT_THREAD_PRIORITY
 		PHY polling is CPU intensive and can interfere with the usability of
 		of threads competing for CPU bandwidth.
 
+config NETINIT_DHCPC_RETRIES
+	int "DHCP retry count"
+	default 0
+	depends on NETINIT_DHCPC
+	range 0 100
+	---help---
+		Retry DHCP this many times after the initial request fails.  This is
+		useful when an Ethernet PHY needs time to establish the link after the
+		interface is brought up.  Zero preserves the single-attempt behavior.
+
+config NETINIT_DHCPC_RETRY_MSEC
+	int "DHCP retry interval (msec)"
+	default 2000
+	depends on NETINIT_DHCPC && NETINIT_DHCPC_RETRIES > 0
+	range 100 60000
+	---help---
+		Delay between failed DHCP requests.
+
 config NETINIT_RETRY_MOUNTPATH
 	int "Network initialization retry mount path count"
 	default 0

@@ -75,6 +75,14 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
+#ifndef CONFIG_NETINIT_DHCPC_RETRIES
+#  define CONFIG_NETINIT_DHCPC_RETRIES 0
+#endif
+
+#ifndef CONFIG_NETINIT_DHCPC_RETRY_MSEC
+#  define CONFIG_NETINIT_DHCPC_RETRY_MSEC 2000
+#endif
+
 /* Pick one and at most one supported link layer so that all decisions are
  * made consistently.
  *
@@ -659,9 +667,18 @@ static void netinit_net_bringup(void)
 #ifdef CONFIG_NETUTILS_DHCPC
   if (g_use_dhcpc)
     {
-      if (netlib_obtain_ipv4addr(NET_DEVNAME) < 0)
+      int retries = CONFIG_NETINIT_DHCPC_RETRIES;
+
+      while (netlib_obtain_ipv4addr(NET_DEVNAME) < 0)
         {
-          return;
+          if (retries-- <= 0)
+            {
+              return;
+            }
+
+          ninfo("DHCP failed; retrying in %d ms\n",
+                CONFIG_NETINIT_DHCPC_RETRY_MSEC);
+          usleep(CONFIG_NETINIT_DHCPC_RETRY_MSEC * 1000);
         }
     }
 #endif
