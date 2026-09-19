@@ -27,6 +27,6 @@ MODULE = $(CONFIG_EXAMPLES_LVGLDEMO)
 
 # LVGL demo Example
 
-MAINSRC = lvgldemo.c
+MAINSRC = lvgldemo.c lvgldemo_font_common_16_data.c lvgldemo_font_common_16_static.c
 
 include $(APPDIR)/Application.mk

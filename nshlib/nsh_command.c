@@ -24,9 +24,11 @@
 
 #include <nuttx/config.h>
 
+#include <signal.h>
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #ifdef CONFIG_NSH_BUILTIN_APPS
 #  include <nuttx/lib/builtin.h>
@@ -73,6 +75,45 @@ struct cmdmap_s
   FAR const char *usage;  /* Usage instructions for 'help' command */
 #endif
 };
+
+#ifndef CONFIG_DISABLE_SIGNALS
+static void nsh_command_sigint(int signo)
+{
+  UNUSED(signo);
+}
+
+static int nsh_command_enterctty(FAR struct nsh_vtbl_s *vtbl,
+                                 FAR struct sigaction *oldact)
+{
+  struct sigaction act;
+  int ret;
+
+  memset(&act, 0, sizeof(act));
+  act.sa_handler = nsh_command_sigint;
+  sigemptyset(&act.sa_mask);
+
+  ret = sigaction(SIGINT, &act, oldact);
+  if (ret < 0)
+    {
+      return ret;
+    }
+
+  ret = nsh_ioctl(vtbl, TIOCSCTTY, getpid());
+  if (ret < 0)
+    {
+      sigaction(SIGINT, oldact, NULL);
+    }
+
+  return ret;
+}
+
+static void nsh_command_exitctty(FAR struct nsh_vtbl_s *vtbl,
+                                 FAR const struct sigaction *oldact)
+{
+  nsh_ioctl(vtbl, TIOCNOTTY, 0);
+  sigaction(SIGINT, oldact, NULL);
+}
+#endif
 
 /****************************************************************************
  * Private Function Prototypes
@@ -1253,6 +1294,10 @@ int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
   int                     index;
 #endif
   int                     ret;
+#ifndef CONFIG_DISABLE_SIGNALS
+  struct sigaction        oldact;
+  bool                    command_tty = false;
+#endif
 
   /* The form of argv is:
    *
@@ -1276,7 +1321,23 @@ int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
       builtin = builtin_for_index(index);
       if (builtin != NULL)
         {
-          return (builtin->main)(argc, (FAR char **)argv);
+#ifndef CONFIG_DISABLE_SIGNALS
+          if (vtbl->isctty && nsh_command_enterctty(vtbl, &oldact) == 0)
+            {
+              command_tty = true;
+            }
+#endif
+
+          ret = (builtin->main)(argc, (FAR char **)argv);
+
+#ifndef CONFIG_DISABLE_SIGNALS
+          if (command_tty)
+            {
+              nsh_command_exitctty(vtbl, &oldact);
+            }
+#endif
+
+          return ret;
         }
     }
 #endif
@@ -1318,7 +1379,22 @@ int nsh_command(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char *argv[])
         }
     }
 
+#ifndef CONFIG_DISABLE_SIGNALS
+  if (vtbl->isctty && nsh_command_enterctty(vtbl, &oldact) == 0)
+    {
+      command_tty = true;
+    }
+#endif
+
   ret = handler(vtbl, argc, argv);
+
+#ifndef CONFIG_DISABLE_SIGNALS
+  if (command_tty)
+    {
+      nsh_command_exitctty(vtbl, &oldact);
+    }
+#endif
+
   vtbl->np.np_lastpid = getpid();
   return ret;
 }

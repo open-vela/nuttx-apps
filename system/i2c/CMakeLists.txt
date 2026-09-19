@@ -19,6 +19,25 @@
 # ##############################################################################
 
 if(CONFIG_SYSTEM_I2CTOOL)
+  set(CAM_HAL_DIR
+      ${TOPDIR}/arch/risc-v/src/chip/esp-hal-3rdparty/components)
+  target_include_directories(i2c PRIVATE
+                             ${CAM_HAL_DIR}/esp_hal_cam/include
+                             ${CAM_HAL_DIR}/esp_hal_cam/esp32p4/include
+                             ${CAM_HAL_DIR}/esp_hal_dma/include
+                             ${CAM_HAL_DIR}/esp_hal_dma/esp32p4/include
+                             ${CAM_HAL_DIR}/hal/include
+                             ${CAM_HAL_DIR}/hal/platform_port/include
+                             ${CAM_HAL_DIR}/hal/esp32p4/include
+                             ${CAM_HAL_DIR}/esp_common/include
+                             ${CAM_HAL_DIR}/heap/include
+                             ${CAM_HAL_DIR}/esp_hw_support/include
+                             ${CAM_HAL_DIR}/esp_hw_support/ldo/include
+                             ${CAM_HAL_DIR}/esp_system/include
+                             ${CAM_HAL_DIR}/esp_mm/include
+                             ${TOPDIR}/arch/risc-v/src/chip/esp-hal-3rdparty/nuttx/esp32p4/include
+                             ${CAM_HAL_DIR}/soc/esp32p4/include
+                             ${CAM_HAL_DIR}/soc/esp32p4/register/hw_ver3)
   set(SRCS i2c_main.c)
   list(
     APPEND
@@ -31,7 +50,9 @@ if(CONFIG_SYSTEM_I2CTOOL)
     i2c_verf.c
     i2c_devif.c
     i2c_dump.c
-    i2c_hexdump.c)
+    i2c_hexdump.c
+    i2c_gt911.c
+    i2c_sc2336.c)
   if(CONFIG_I2C_RESET)
     list(APPEND SRCS i2c_reset.c)
   endif()

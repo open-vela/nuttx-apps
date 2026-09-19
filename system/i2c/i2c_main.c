@@ -62,6 +62,8 @@ static const struct cmdmap_s g_i2ccmds[] =
   { "dev",   i2ccmd_dev,   "List devices  ", "[OPTIONS] <first> <last>" },
   { "get",   i2ccmd_get,   "Read register ", "[OPTIONS] [<repetitions>]" },
   { "dump",  i2ccmd_dump,  "Dump register ", "[OPTIONS] [<num bytes>]" },
+  { "gt911", i2ccmd_gt911, "Read GT911     ", "[<samples>] [<delay_ms>]" },
+  { "sc2336", i2ccmd_sc2336, "Read SC2336 PID", NULL },
   { "help",  i2ccmd_help,  "Show help     ", NULL },
   {
     "set",   i2ccmd_set,   "Write register",

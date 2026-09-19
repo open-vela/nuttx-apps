@@ -22,6 +22,16 @@ include $(APPDIR)/Make.defs
 
 # LVGL graphic library
 
+# Keep the traditional Make build aligned with the CMake LVGL integration.
+# The Kconfig string defaults are emitted as C string literals, but these two
+# LVGL attributes are used as C declaration tokens.
+CFLAGS += "-DLV_ATTRIBUTE_MEM_ALIGN=aligned_data(LV_DRAW_BUF_ALIGN)"
+CFLAGS += "-DLV_ATTRIBUTE_LARGE_CONST="
+CFLAGS += -include $(APPDIR)/graphics/lvgl/lv_nuttx_compat.h
+CXXFLAGS += "-DLV_ATTRIBUTE_MEM_ALIGN=aligned_data(LV_DRAW_BUF_ALIGN)"
+CXXFLAGS += "-DLV_ATTRIBUTE_LARGE_CONST="
+CXXFLAGS += -include $(APPDIR)/graphics/lvgl/lv_nuttx_compat.h
+
 LVGL_DIR = .
 LVGL_DIR_NAME = lvgl
 

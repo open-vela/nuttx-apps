@@ -25,6 +25,10 @@ config LV_GPU_G2D_INCLUDE_PATH
 	depends on LV_USE_DRAW_G2D
 	default ""
 
-osource "$APPSDIR/graphics/lvgl/lvgl/Kconfig"
+# The optional nested LVGL Kconfig is not present in this manifest.
+# L0 does not enable GRAPHICS_LVGL, so keep this include disabled.
+# The current Function-EV framebuffer experiment supplies the ignored LVGL
+# source package, so expose its Kconfig when the package is present.
+source "$APPSDIR/graphics/lvgl/lvgl/Kconfig"
 
 endif # GRAPHICS_LVGL

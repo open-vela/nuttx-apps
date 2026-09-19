@@ -182,6 +182,8 @@ int i2ccmd_bus(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv);
 int i2ccmd_dev(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv);
 int i2ccmd_get(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv);
 int i2ccmd_dump(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv);
+int i2ccmd_gt911(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv);
+int i2ccmd_sc2336(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv);
 int i2ccmd_set(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv);
 int i2ccmd_verf(FAR struct i2ctool_s *i2ctool, int argc, FAR char **argv);
 

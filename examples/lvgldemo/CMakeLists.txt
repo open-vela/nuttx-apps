@@ -31,5 +31,7 @@ if(CONFIG_EXAMPLES_LVGLDEMO)
     DEPENDS
     lvgl
     SRCS
-    lvgldemo.c)
+    lvgldemo.c
+    lvgldemo_font_common_16_data.c
+    lvgldemo_font_common_16_static.c)
 endif()
