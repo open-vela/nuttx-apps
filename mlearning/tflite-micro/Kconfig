@@ -21,7 +21,10 @@
 config TFLITEMICRO
 	bool "TFLiteMicro"
 	default n
-	depends on SYSTEM_FLATBUFFERS && MATH_GEMMLOWP && MATH_KISSFFT && MATH_RUY
+	# ruy needs std::mutex/std::thread, which the bare-metal arm-none-eabi
+	# libstdc++ does not provide, and the TFLM runtime does not use it (only
+	# the full TFLite does) - so it is not a dependency here.
+	depends on SYSTEM_FLATBUFFERS && MATH_GEMMLOWP && MATH_KISSFFT
 
 if TFLITEMICRO
 	config TFLITEMICRO_DEBUG
