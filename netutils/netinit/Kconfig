@@ -106,6 +106,30 @@ config NETINIT_RETRYMSEC
 
 endif # NETINIT_MONITOR
 
+config NETINIT_CARRIER_POLL
+	bool "Monitor carrier state by polling"
+	default n
+	depends on NET_ETHERNET && NET_IPv4 && NET_UDP && !NETINIT_MONITOR
+	---help---
+		Keep the network initialization thread alive and poll IFF_RUNNING.
+		On carrier loss, clear the active IPv4 configuration without taking
+		the interface administratively down.  On carrier recovery, obtain a
+		new DHCP lease when NETINIT_DHCPC is selected.
+
+if NETINIT_CARRIER_POLL
+
+config NETINIT_CARRIER_POLL_MSEC
+	int "Carrier polling period (msec)"
+	default 500
+	range 100 60000
+
+config NETINIT_DHCP_RETRYMSEC
+	int "DHCP retry period while carrier is present (msec)"
+	default 5000
+	range 1000 300000
+
+endif # NETINIT_CARRIER_POLL
+
 config NETINIT_THREAD_STACKSIZE
 	int "Network initialization thread stack size"
 	default DEFAULT_TASK_STACKSIZE

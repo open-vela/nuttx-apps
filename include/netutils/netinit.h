@@ -27,6 +27,9 @@
 
 #include <nuttx/config.h>
 
+#include <netinet/in.h>
+#include <stdbool.h>
+
 #ifdef CONFIG_NETUTILS_NETINIT
 
 /****************************************************************************
@@ -81,6 +84,30 @@
 #endif
 
 /****************************************************************************
+ * Public Types
+ ****************************************************************************/
+
+/* Runtime IPv4 policy owned by netinit.  Carrier recovery and immediate
+ * apply share the same policy so UI/config code never becomes a second
+ * DHCP/static owner.
+ */
+
+enum netinit_ipv4_mode
+{
+  NETINIT_IPV4_DHCP = 0,
+  NETINIT_IPV4_STATIC
+};
+
+struct netinit_ipv4_config
+{
+  enum netinit_ipv4_mode mode;
+  struct in_addr address;
+  struct in_addr netmask;
+  struct in_addr router;
+  struct in_addr dns;
+};
+
+/****************************************************************************
  * Public Function Prototypes
  ****************************************************************************/
 
@@ -101,6 +128,34 @@ extern "C"
  ****************************************************************************/
 
 int netinit_bringup(void);
+
+/****************************************************************************
+ * Name: netinit_set_ipv4_config
+ *
+ * Description:
+ *   Install the desired IPv4 policy (DHCP or static).  The policy is
+ *   retained across carrier loss and re-applied on recovery.  Missing
+ *   carrier is not treated as a configuration failure.
+ *
+ * Input Parameters:
+ *   config - Desired IPv4 policy.  Must not be NULL.
+ *
+ * Returned Value:
+ *   OK on success; a negated errno on parameter or system-call failure.
+ *
+ ****************************************************************************/
+
+int netinit_set_ipv4_config(FAR const struct netinit_ipv4_config *config);
+
+/****************************************************************************
+ * Name: netinit_get_ipv4_config
+ *
+ * Description:
+ *   Copy the currently desired IPv4 policy.
+ *
+ ****************************************************************************/
+
+int netinit_get_ipv4_config(FAR struct netinit_ipv4_config *config);
 
 /****************************************************************************
  * Name: netinit_associate

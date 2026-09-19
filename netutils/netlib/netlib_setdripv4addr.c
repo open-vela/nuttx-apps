@@ -111,10 +111,13 @@ int netlib_set_dripv4addr(FAR const char *ifname,
 
               delroute(sockfd, &target, &netmask, sizeof(target));
 
-              /* Then add the new default route */
+              /* Then add the new default route unless zero means clear. */
 
-              ret = addroute(sockfd, &target, &netmask,
-                             &router, sizeof(router));
+              if (addr->s_addr != INADDR_ANY)
+                {
+                  ret = addroute(sockfd, &target, &netmask,
+                                 &router, sizeof(router));
+                }
             }
 #endif
 
