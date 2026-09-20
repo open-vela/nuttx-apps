@@ -170,6 +170,7 @@ int wpa_driver_wext_set_key_ext(int sockfd, FAR const char *ifname,
       return -ENOMEM;
     }
 
+  memset(ext, 0, sizeof(*ext) + key_len);
   memset(&iwr, 0, sizeof(iwr));
   strlcpy(iwr.ifr_name, ifname, IFNAMSIZ);
 
@@ -202,6 +203,7 @@ int wpa_driver_wext_set_key_ext(int sockfd, FAR const char *ifname,
 
       default:
         nerr("ERROR: Unknown algorithm %d", alg);
+        memset(ext, 0, sizeof(*ext) + key_len);
         free(ext);
         return -EINVAL;
     }
@@ -212,6 +214,7 @@ int wpa_driver_wext_set_key_ext(int sockfd, FAR const char *ifname,
       nerr("ERROR: ioctl[SIOCSIWENCODEEXT]: %d", errno);
     }
 
+  memset(ext, 0, sizeof(*ext) + key_len);
   free(ext);
   return ret;
 }
