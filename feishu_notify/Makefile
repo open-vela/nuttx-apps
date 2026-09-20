@@ -1,5 +1,5 @@
 ############################################################################
-# apps/crypto/mbedtls/Make.defs
+# apps/feishu_notify/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,16 +18,18 @@
 #
 ############################################################################
 
-ifneq ($(CONFIG_CRYPTO_MBEDTLS),)
-CONFIGURED_APPS += $(APPDIR)/crypto/mbedtls
+include $(APPDIR)/Make.defs
 
-# Allows `<mbedtls/<>.h>` import.
+PROGNAME  = $(CONFIG_FEISHU_NOTIFY_PROGNAME)
+PRIORITY  = $(CONFIG_FEISHU_NOTIFY_PRIORITY)
+STACKSIZE = $(CONFIG_FEISHU_NOTIFY_STACKSIZE)
+MODULE    = $(CONFIG_FEISHU_NOTIFY)
 
-# Use -isystem so ESP-HAL -I paths take precedence over mbedTLS headers
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
+CSRCS  = feishu_notify.c
+CSRCS += feishu_http.c
 
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
+MAINSRC = feishu_main.c
 
-endif
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/feishu_notify/include
+
+include $(APPDIR)/Application.mk

@@ -1,0 +1,22 @@
+config EXAMPLES_CAMCAP
+	tristate "Camera frame capture to file"
+	default n
+	depends on VIDEO_STREAM
+	---help---
+		Capture a single frame from /dev/video0 and save to file.
+		Supports raw RGB565 output. JPEG output via /dev/jpeg when
+		ESP32-P4 hardware encoder is available.
+
+if EXAMPLES_CAMCAP
+config EXAMPLES_CAMCAP_PROGNAME
+	string "Program name"
+	default "camcap"
+
+config EXAMPLES_CAMCAP_PRIORITY
+	int "camcap task priority"
+	default 100
+
+config EXAMPLES_CAMCAP_STACKSIZE
+	int "camcap stack size"
+	default 16384
+endif

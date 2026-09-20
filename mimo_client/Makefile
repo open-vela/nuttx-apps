@@ -1,5 +1,5 @@
 ############################################################################
-# apps/crypto/mbedtls/Make.defs
+# apps/mimo_client/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,16 +18,20 @@
 #
 ############################################################################
 
-ifneq ($(CONFIG_CRYPTO_MBEDTLS),)
-CONFIGURED_APPS += $(APPDIR)/crypto/mbedtls
+include $(APPDIR)/Make.defs
 
-# Allows `<mbedtls/<>.h>` import.
+# MiMo client library sources
 
-# Use -isystem so ESP-HAL -I paths take precedence over mbedTLS headers
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
+CSRCS  = mimo_client.c
+CSRCS += mimo_http.c
+CSRCS += mimo_modality.c
+CSRCS += mimo_text.c
+CSRCS += mimo_vision.c
+CSRCS += mimo_tts.c
+CSRCS += mimo_asr.c
 
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
+# Include paths
 
-endif
+CFLAGS += ${INCDIR_PREFIX}$(APPDIR)/mimo_client/include
+
+include $(APPDIR)/Application.mk

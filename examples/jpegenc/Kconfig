@@ -1,0 +1,22 @@
+config EXAMPLES_JPEGENC
+	tristate "JPEG M2M encode one RGB565 frame to file"
+	default n
+	depends on VIDEO_STREAM
+	---help---
+		Encode a single RGB565 frame (/data/capture.rgb565) to JPEG
+		(/data/capture.jpg) using the ESP32-P4 hardware JPEG encoder
+		via /dev/video1 (V4L2 M2M).
+
+if EXAMPLES_JPEGENC
+config EXAMPLES_JPEGENC_PROGNAME
+	string "Program name"
+	default "jpegenc"
+
+config EXAMPLES_JPEGENC_PRIORITY
+	int "jpegenc task priority"
+	default 100
+
+config EXAMPLES_JPEGENC_STACKSIZE
+	int "jpegenc stack size"
+	default 16384
+endif

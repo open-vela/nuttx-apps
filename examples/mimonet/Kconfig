@@ -1,0 +1,33 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_MIMONET
+	tristate "MiMo API network self-test"
+	default n
+	depends on NET_TCP && NETDB_DNSCLIENT && CRYPTO_MBEDTLS
+	---help---
+		Staged connectivity self-test against the Xiaomi MiMo API:
+		DNS resolution, TCP connect, TLS handshake and an HTTPS GET.
+		Each stage reports PASS or FAIL independently so that a failure
+		points directly at the offending layer.
+
+if EXAMPLES_MIMONET
+
+config EXAMPLES_MIMONET_PROGNAME
+	string "Program name"
+	default "mimonet"
+
+config EXAMPLES_MIMONET_PRIORITY
+	int "mimonet task priority"
+	default 100
+
+config EXAMPLES_MIMONET_STACKSIZE
+	int "mimonet stack size"
+	default 16384
+	---help---
+		The TLS handshake needs a large stack for certificate and
+		key exchange buffers. Do not reduce below 12288.
+
+endif

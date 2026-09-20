@@ -1,0 +1,69 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_CAMPILOT
+	bool "campilot MiMo AI example"
+	default n
+	select MIMO_CLIENT
+	---help---
+		NSH "campilot" command for MiMo AI interaction.
+		Supports:
+		  campilot once [prompt]  - capture image, send to vision API
+		  campilot text <message> - send text query
+
+if EXAMPLES_CAMPILOT
+
+config EXAMPLES_CAMPILOT_PROGNAME
+	string "Program name"
+	default "campilot"
+
+config EXAMPLES_CAMPILOT_PRIORITY
+	int "Task priority"
+	default 100
+
+config EXAMPLES_CAMPILOT_STACKSIZE
+	int "Stack size"
+	default 32768
+
+config EXAMPLES_CAMPILOT_AUTOTEST
+	bool "Auto-run campilot test at boot"
+	default n
+	---help---
+		Automatically spawn a campilot auto-test task from the board's
+		bringup code (esp32p4-function-ev-board), which configures the
+		network and sends a text query to MiMo once at boot.
+
+		Disable this when the auto-test interferes with interactive NSH
+		use. The "campilot" command itself remains available regardless
+		of this setting.
+
+config EXAMPLES_CAMPILOT_FEISHU
+	bool "Push analysis result to Feishu"
+	default n
+	select FEISHU_NOTIFY
+	---help---
+		After each vision/text analysis, push the result text to a Feishu
+		group chat via feishu_notify. The target chat_id is read from
+		board_secrets.h (BOARD_FEISHU_CHAT_ID) or FEISHU_NOTIFY_CHAT_ID.
+
+config EXAMPLES_CAMPILOT_UI
+	bool "LVGL three-screen card UI"
+	default n
+	depends on GRAPHICS_LVGL
+	select LV_USE_NUTTX
+	select LV_FONT_MONTSERRAT_24
+	select LV_FONT_MONTSERRAT_48
+	select ESP32P4_GT911_SHIM
+	---help---
+		Build the LVGL three-screen card UI (camera preview, AI result,
+		voice dialog) with left/right swipe navigation and tap detection,
+		driven by the board-level GT911 polling shim.
+
+		This only adds the UI sources (ui_state_machine.c, ui_lvgl.c) to the
+		campilot binary; wiring ui_lvgl_main() into campilot_main.c is a
+		separate bring-up step. The GT911 shim and the LVGL NuttX framebuffer
+		driver are selected automatically.
+
+endif # EXAMPLES_CAMPILOT

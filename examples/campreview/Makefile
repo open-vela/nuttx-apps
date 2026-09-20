@@ -1,5 +1,5 @@
 ############################################################################
-# apps/crypto/mbedtls/Make.defs
+# apps/examples/campreview/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,16 +18,17 @@
 #
 ############################################################################
 
-ifneq ($(CONFIG_CRYPTO_MBEDTLS),)
-CONFIGURED_APPS += $(APPDIR)/crypto/mbedtls
+include $(APPDIR)/Make.defs
 
-# Allows `<mbedtls/<>.h>` import.
+# campreview built-in application info
 
-# Use -isystem so ESP-HAL -I paths take precedence over mbedTLS headers
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
+PROGNAME  = $(CONFIG_EXAMPLES_CAMPREVIEW_PROGNAME)
+PRIORITY  = $(CONFIG_EXAMPLES_CAMPREVIEW_PRIORITY)
+STACKSIZE = $(CONFIG_EXAMPLES_CAMPREVIEW_STACKSIZE)
+MODULE    = $(CONFIG_EXAMPLES_CAMPREVIEW)
 
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
+# campreview Example
 
-endif
+MAINSRC = campreview_main.c
+
+include $(APPDIR)/Application.mk

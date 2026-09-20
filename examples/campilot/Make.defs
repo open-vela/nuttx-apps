@@ -1,5 +1,5 @@
 ############################################################################
-# apps/crypto/mbedtls/Make.defs
+# apps/examples/campilot/Make.defs
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,16 +18,6 @@
 #
 ############################################################################
 
-ifneq ($(CONFIG_CRYPTO_MBEDTLS),)
-CONFIGURED_APPS += $(APPDIR)/crypto/mbedtls
-
-# Allows `<mbedtls/<>.h>` import.
-
-# Use -isystem so ESP-HAL -I paths take precedence over mbedTLS headers
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
-
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
-
+ifneq ($(CONFIG_EXAMPLES_CAMPILOT),)
+CONFIGURED_APPS += $(APPDIR)/examples/campilot
 endif

@@ -1,0 +1,39 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config MIMO_CLIENT
+	bool "MiMo multimodal client library"
+	default n
+	select NETUTILS_CJSON
+	---help---
+		Enables the MiMo multimodal client library for communicating
+		with the Xiaomi MiMo AI API. Supports text and vision
+		modalities over HTTPS/TLS.
+
+if MIMO_CLIENT
+
+config MIMO_CLIENT_USE_BOARD_SECRETS
+	bool "Use board_secrets.h for API credentials"
+	default y
+	---help---
+		When enabled, API key, host, and port are read from
+		<arch/board/board_secrets.h> instead of Kconfig values.
+		This keeps credentials out of the public defconfig.
+
+config MIMO_CLIENT_API_KEY
+	string "MiMo API Key (fallback)"
+	default ""
+	---help---
+		Fallback API key when MIMO_CLIENT_USE_BOARD_SECRETS is disabled.
+
+config MIMO_CLIENT_HOST
+	string "MiMo API Host"
+	default "token-plan-cn.xiaomimimo.com"
+
+config MIMO_CLIENT_PORT
+	string "MiMo API Port"
+	default "443"
+
+endif # MIMO_CLIENT

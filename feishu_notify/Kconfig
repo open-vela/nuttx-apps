@@ -1,0 +1,63 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config FEISHU_NOTIFY
+	bool "Feishu (Lark) notification client"
+	default n
+	select NETUTILS_CJSON
+	---help---
+		Enables a minimal Feishu notification client that sends text
+		messages to a Feishu group chat via the Feishu OpenAPI
+		(tenant_access_token + im/v1/messages) over HTTPS/TLS.
+
+if FEISHU_NOTIFY
+
+config FEISHU_NOTIFY_USE_BOARD_SECRETS
+	bool "Use board_secrets.h for Feishu credentials"
+	default y
+	---help---
+		When enabled, App ID, App Secret, and default chat_id are read from
+		<arch/board/board_secrets.h> instead of the Kconfig values below.
+		This keeps credentials out of the public defconfig.
+
+config FEISHU_NOTIFY_APP_ID
+	string "Feishu App ID (fallback)"
+	default ""
+	---help---
+		Fallback App ID when FEISHU_NOTIFY_USE_BOARD_SECRETS is disabled.
+
+config FEISHU_NOTIFY_APP_SECRET
+	string "Feishu App Secret (fallback)"
+	default ""
+	---help---
+		Fallback App Secret when FEISHU_NOTIFY_USE_BOARD_SECRETS is disabled.
+
+config FEISHU_NOTIFY_CHAT_ID
+	string "Default Feishu chat_id (fallback)"
+	default ""
+	---help---
+		Fallback target chat_id when FEISHU_NOTIFY_USE_BOARD_SECRETS is
+		disabled. Used by "feishu test" and campilot auto-push.
+
+config FEISHU_NOTIFY_OPEN_ID
+	string "Default Feishu open_id (fallback)"
+	default ""
+	---help---
+		Fallback DM recipient open_id when FEISHU_NOTIFY_USE_BOARD_SECRETS is
+		disabled. Used by "feishu dm" and campilot auto-push (direct message).
+
+config FEISHU_NOTIFY_PROGNAME
+	string "Program name"
+	default "feishu"
+
+config FEISHU_NOTIFY_PRIORITY
+	int "Task priority"
+	default 100
+
+config FEISHU_NOTIFY_STACKSIZE
+	int "Stack size"
+	default 8192
+
+endif # FEISHU_NOTIFY

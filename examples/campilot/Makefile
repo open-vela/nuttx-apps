@@ -1,5 +1,5 @@
 ############################################################################
-# apps/crypto/mbedtls/Make.defs
+# apps/examples/campilot/Makefile
 #
 # Licensed to the Apache Software Foundation (ASF) under one or more
 # contributor license agreements.  See the NOTICE file distributed with
@@ -18,16 +18,17 @@
 #
 ############################################################################
 
-ifneq ($(CONFIG_CRYPTO_MBEDTLS),)
-CONFIGURED_APPS += $(APPDIR)/crypto/mbedtls
+include $(APPDIR)/Make.defs
 
-# Allows `<mbedtls/<>.h>` import.
+PROGNAME  = $(CONFIG_EXAMPLES_CAMPILOT_PROGNAME)
+PRIORITY  = $(CONFIG_EXAMPLES_CAMPILOT_PRIORITY)
+STACKSIZE = $(CONFIG_EXAMPLES_CAMPILOT_STACKSIZE)
+MODULE    = $(CONFIG_EXAMPLES_CAMPILOT)
 
-# Use -isystem so ESP-HAL -I paths take precedence over mbedTLS headers
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
+MAINSRC = campilot_main.c
 
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/include
-CXXFLAGS += -isystem$(APPDIR)/crypto/mbedtls/mbedtls/include
-
+ifeq ($(CONFIG_EXAMPLES_CAMPILOT_UI),y)
+CSRCS = ui_state_machine.c ui_lvgl.c
 endif
+
+include $(APPDIR)/Application.mk

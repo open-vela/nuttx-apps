@@ -1,0 +1,31 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_CAMPREVIEW
+	tristate "Camera preview example"
+	default n
+	depends on DRIVERS_VIDEO && VIDEO_FB
+	---help---
+		Enable the camera preview example. Captures RGB565 frames from
+		/dev/video0 and renders them into the RGB888 framebuffer /dev/fb0.
+
+if EXAMPLES_CAMPREVIEW
+
+config EXAMPLES_CAMPREVIEW_PROGNAME
+	string "Program name"
+	default "campreview"
+	---help---
+		This is the name of the program that will be use when the NSH ELF
+		program is installed.
+
+config EXAMPLES_CAMPREVIEW_PRIORITY
+	int "Camera preview task priority"
+	default 100
+
+config EXAMPLES_CAMPREVIEW_STACKSIZE
+	int "Camera preview stack size"
+	default 4096
+
+endif
