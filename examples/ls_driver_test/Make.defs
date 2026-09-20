@@ -1,0 +1,3 @@
+ifneq ($(CONFIG_EXAMPLES_LS_DRIVER_TEST),)
+CONFIGURED_APPS += $(APPDIR)/examples/ls_driver_test
+endif
