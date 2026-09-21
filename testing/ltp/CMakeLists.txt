@@ -386,7 +386,7 @@ if(CONFIG_TESTING_LTP)
   # to build the linux kernel testcases
   set(TESTLINUX_DIR ${LTP_UNPACK}/testcases/kernel)
 
-  if(EXISTS ${TESTLINUX_DIR})
+  if(EXISTS ${TESTLINUX_DIR} AND CONFIG_TESTING_LTP_KERNEL)
     list(
       APPEND
       BLACKWORDS

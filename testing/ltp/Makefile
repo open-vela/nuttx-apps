@@ -259,6 +259,8 @@ endif # TESTDIR not empty
 
 ########################################################################################
 
+ifeq ($(CONFIG_TESTING_LTP_KERNEL),y)
+
 TESTLINUX_DIR = $(LTP_UNPACK)/testcases/kernel
 
 # there are two kinds of testcases that kernel api can run, first is using main() function
@@ -657,6 +659,8 @@ CFLAGS += -Wno-undef -Wno-pointer-sign -Wno-parentheses -Wno-use-after-free
 CFLAGS += -Wno-discarded-qualifiers -Wno-implicit-int -Wno-pointer-to-int-cast
 CFLAGS += -Wno-switch-bool -Wno-restrict -Wno-stringop-overflow -Wno-array-bounds
 CFLAGS += -Wno-shift-count-overflow -Wno-stringop-overread
+
+endif # CONFIG_TESTING_LTP_KERNEL
 
 # Locate the file you want to replace,
 # starting from the ltp/ directory level,

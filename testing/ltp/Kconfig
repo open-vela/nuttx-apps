@@ -15,4 +15,14 @@ config TESTING_LTP_STACKSIZE
 	int "Linux Test Project stack size"
 	default 4096
 
+config TESTING_LTP_KERNEL
+	bool "Enable LTP Linux kernel test cases"
+	default n
+	---help---
+		Build the Linux kernel test cases under testcases/kernel.
+
+		These tests require additional NuttX compatibility support,
+		including loop devices, netdb, and Linux helper APIs.  Keep
+		this disabled until those dependencies are available.
+
 endif #TESTING_LTP
