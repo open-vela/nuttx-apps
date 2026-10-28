@@ -48,6 +48,41 @@
 
 #ifdef CONFIG_NETUTILS_ESP8266
 
+/* Header (esp8266.h) publishes lespSSID_SIZE / lesp_eMODE_* names.
+ * This translation unit still uses the older LESP_* identifiers.
+ */
+
+#ifndef LESP_SSID_SIZE
+#  define LESP_SSID_SIZE               lespSSID_SIZE
+#endif
+#ifndef LESP_BSSID_SIZE
+#  define LESP_BSSID_SIZE              lespBSSID_SIZE
+#endif
+#ifndef LESP_MODE_AP
+#  define LESP_MODE_AP                 lesp_eMODE_AP
+#endif
+#ifndef LESP_MODE_STATION
+#  define LESP_MODE_STATION            lesp_eMODE_STATION
+#endif
+#ifndef LESP_SECURITY_NONE
+#  define LESP_SECURITY_NONE           lesp_eSECURITY_NONE
+#endif
+#ifndef LESP_SECURITY_WEP
+#  define LESP_SECURITY_WEP            lesp_eSECURITY_WEP
+#endif
+#ifndef LESP_SECURITY_WPA_PSK
+#  define LESP_SECURITY_WPA_PSK        lesp_eSECURITY_WPA_PSK
+#endif
+#ifndef LESP_SECURITY_WPA2_PSK
+#  define LESP_SECURITY_WPA2_PSK       lesp_eSECURITY_WPA2_PSK
+#endif
+#ifndef LESP_SECURITY_WPA_WPA2_PSK
+#  define LESP_SECURITY_WPA_WPA2_PSK   lesp_eSECURITY_WPA_WPA2_PSK
+#endif
+#ifndef LESP_SECURITY_NBR
+#  define LESP_SECURITY_NBR            lesp_eSECURITY_NBR
+#endif
+
 /****************************************************************************
  * Pre-processor Definitions
  ****************************************************************************/

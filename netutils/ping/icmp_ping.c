@@ -256,7 +256,12 @@ void icmp_ping(FAR const struct ping_info_s *info)
 
   iobuffer = (FAR uint8_t *)(&priv->outhdr);
 
-  priv->sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
+  /* A task spawned during ping must not retain this raw socket. An
+   * inherited, unread ICMP socket would queue later echo replies until
+   * the shared I/O buffer pool is exhausted.
+   */
+
+  priv->sockfd = socket(AF_INET, SOCK_RAW | SOCK_CLOEXEC, IPPROTO_ICMP);
   if (priv->sockfd < 0)
     {
       icmp_callback(&result, ICMP_E_SOCKET, errno);
