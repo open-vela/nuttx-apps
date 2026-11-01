@@ -19,6 +19,8 @@ if(CONFIG_EXAMPLES_LS_DRIVER_TEST)
     ls_driver_test.c
     test_common.c
     test_led.c
+    test_lcd.c
+    lcd_draw.c
     test_oled.c
     test_key.c
     test_thermal.c

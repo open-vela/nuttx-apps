@@ -50,6 +50,7 @@ static void show_usage(FAR const char *progname)
   printf("    buzzer    - Buzzer (GPIO%d) with KEY control\n", 75);
   printf("    spiflash  - SPI Flash + ADC (KEY1: read/save, KEY2: exit)\n");
   printf("    uart2     - UART2 echo (GPIO44 TX / GPIO45 RX)\n");
+  printf("    lcd       - LCD LED status panel (lcd [period_ms] | lcd dump)\n");
   printf("    all       - Run all tests (default)\n");
 }
 
@@ -167,6 +168,18 @@ int main(int argc, FAR char *argv[])
           test_uart2();
 #else
           printf("GPIO and Pinctrl drivers not enabled\n");
+#endif
+        }
+      else if (strcmp(argv[1], "lcd") == 0)
+        {
+#ifdef CONFIG_LS2K0300_DC
+          /* Not part of "all": this one runs until interrupted and
+           * claims the same GPIOs test_led uses.
+           */
+
+          test_lcd(argc - 1, argv + 1);
+#else
+          printf("Display controller driver not enabled\n");
 #endif
         }
       else if (strcmp(argv[1], "-h") == 0 ||

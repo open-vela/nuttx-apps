@@ -232,7 +232,7 @@ static int spi2_xfer_byte(uint8_t tx, uint8_t *rx)
   return -1;
 }
 
-static int mcp3204_init(void)
+int mcp3204_init(void)
 {
   int ret;
   uint32_t brint;
@@ -281,7 +281,7 @@ static int mcp3204_init(void)
   return 0;
 }
 
-static void mcp3204_deinit(void)
+void mcp3204_deinit(void)
 {
   if (g_fd_cs >= 0)
     {
@@ -321,7 +321,7 @@ static int mcp3204_read_raw(uint8_t channel, uint16_t *raw)
   return 0;
 }
 
-static int mcp3204_read_average(uint8_t channel, uint16_t *raw)
+int mcp3204_read_average(uint8_t channel, uint16_t *raw)
 {
   uint32_t sum = 0;
   uint16_t value = 0;
@@ -357,7 +357,7 @@ static int mcp3204_read_average(uint8_t channel, uint16_t *raw)
   return 0;
 }
 
-static uint32_t mcp3204_raw_to_mv(uint16_t raw)
+uint32_t mcp3204_raw_to_mv(uint16_t raw)
 {
   return ((uint32_t)raw * MCP3204_VREF_MV + (MCP3204_ADC_MAX / 2)) /
          MCP3204_ADC_MAX;

@@ -121,7 +121,32 @@ static int bh1750_write_cmd(uint8_t cmd)
   return sensor_i2c_write(g_bh1750_addr, &cmd, 1);
 }
 
-static int bh1750_init(void)
+/* Open the I2C bus shared by the BH1750 and the OLED.  Idempotent, and
+ * exported so the LCD status panel can sample the light sensor without
+ * running the whole OLED test.
+ */
+
+int sensor_bus_open(void)
+{
+  if (g_i2c_fd >= 0)
+    {
+      return OK;
+    }
+
+  g_i2c_fd = open(I2C1_PATH, O_RDWR);
+  return (g_i2c_fd < 0) ? -errno : OK;
+}
+
+void sensor_bus_close(void)
+{
+  if (g_i2c_fd >= 0)
+    {
+      close(g_i2c_fd);
+      g_i2c_fd = -1;
+    }
+}
+
+int bh1750_init(void)
 {
   int ret;
 
@@ -166,7 +191,7 @@ static int bh1750_init(void)
   return OK;
 }
 
-static int bh1750_read_lux(unsigned int *lux_x100)
+int bh1750_read_lux(unsigned int *lux_x100)
 {
   uint8_t buf[2] =
   {

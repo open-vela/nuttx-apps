@@ -9,7 +9,11 @@
 #ifndef __APPS_EXAMPLES_LS_DRIVER_TEST_OLED_FONTS_H
 #define __APPS_EXAMPLES_LS_DRIVER_TEST_OLED_FONTS_H
 
-static unsigned char g_font_6x8[][6] =
+/* 6x8 is used by the SSD1306 path only; lcd_draw.c pulls this header in
+ * for F8X16 and would otherwise trip -Wunused-variable.
+ */
+
+static unsigned char g_font_6x8[][6] __attribute__((unused)) =
 {
   { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, /* sp */
   { 0x00, 0x00, 0x00, 0x2f, 0x00, 0x00 }, /* !  */
