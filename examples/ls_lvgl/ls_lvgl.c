@@ -109,6 +109,13 @@
 
 #define TICK_MS           20
 
+/* Voice push-to-talk: KEY1 doubles as the microphone key.  A tap stays
+ * under this threshold and keeps toggling the selected row; holding it
+ * past the threshold opens a voice session that is closed again when the
+ * key is released.
+ */
+
+#define KEY1_LONGPRESS_TICKS  (500 / TICK_MS)
 
 /* AI subtitle: agent status + reply shown at the bottom of the panel.
  * Written from other tasks via ls_lvgl_set_ai_text(), consumed by the
@@ -737,6 +744,28 @@ static void ui_build(void)
  ****************************************************************************/
 
 /****************************************************************************
+ * Name: ai_agent_voice_ptt
+ *
+ * Description:
+ *   Push-to-talk edge, reported by the UI when KEY1 is held down and
+ *   again when it is released.  The ai_agent turns the pair into a voice
+ *   session and posts progress back through ls_lvgl_set_ai_text().
+ *
+ *   Defined weakly here so the panel still runs when no agent is linked
+ *   in; the strong definition lives in packages/ai_agent.  The UI loop
+ *   calls this on its own tick, so implementations must not block.
+ *
+ * Input Parameters:
+ *   down - true when the key went down, false when it was released.
+ *
+ ****************************************************************************/
+
+__attribute__((weak)) void ai_agent_voice_ptt(bool down)
+{
+  (void)down;
+}
+
+/****************************************************************************
  * Name: utf8_copy
  *
  * Description:
@@ -855,6 +884,8 @@ int main(int argc, FAR char *argv[])
   int tick = 0;
   bool prev1 = false;
   bool prev2 = false;
+  int key1_hold = 0;
+  bool ptt_active = false;
 
   printf("=== LS2K0300 LVGL Console ===\n");
   printf("KEY2(GPIO%d): next item   KEY1(GPIO%d): toggle\n",
@@ -1060,9 +1091,32 @@ int main(int argc, FAR char *argv[])
        * release ends the utterance.
        */
 
-      if (now1 && !prev1)
+      if (now1)
         {
-          ui_toggle_selected();
+          if (key1_hold < KEY1_LONGPRESS_TICKS)
+            {
+              key1_hold++;
+            }
+
+          if (key1_hold == KEY1_LONGPRESS_TICKS && !ptt_active)
+            {
+              ptt_active = true;
+              ai_agent_voice_ptt(true);
+            }
+        }
+      else if (prev1)
+        {
+          if (ptt_active)
+            {
+              ptt_active = false;
+              ai_agent_voice_ptt(false);
+            }
+          else
+            {
+              ui_toggle_selected();
+            }
+
+          key1_hold = 0;
         }
 
       prev1 = now1;
