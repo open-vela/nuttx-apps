@@ -48,6 +48,8 @@
 #include <nuttx/timers/pwm.h>
 #include <nuttx/timers/rtc.h>
 
+#include <pthread.h>
+
 #include <lvgl/lvgl.h>
 
 #include "../ls_driver_test/oled_fonts.h"
@@ -106,6 +108,26 @@
 #define ROW_RTC           7
 
 #define TICK_MS           20
+
+
+/* AI subtitle: agent status + reply shown at the bottom of the panel.
+ * Written from other tasks via ls_lvgl_set_ai_text(), consumed by the
+ * UI loop which owns all LVGL object access.
+ */
+
+#define AI_STATUS_LEN     32
+#define AI_TEXT_LEN       256
+#define AI_TEXT_LINES     2
+#define AI_PANEL_H        96
+
+/* Optional CJK font for the subtitle.  Without this file on the SD card
+ * the subtitle falls back to Montserrat (ASCII only).  Copy
+ * packages/demos/calculator/res/fonts/MiSans-Normal.ttf (or any CJK
+ * ttf) onto the card to render Chinese agent replies.  The card is
+ * FAT-mounted at /mnt, which is writable from a PC.
+ */
+
+#define AI_FONT_PATH      "/mnt/MiSans-Normal.ttf"
 
 /****************************************************************************
  * Private Types
@@ -177,6 +199,16 @@ static struct act_s g_acts[] =
 
 static int g_selected;
 static bool g_state[UI_NACT];
+
+/* Actuator states posted by the agent's board tools.  The tools change the
+ * hardware from their own thread, and LVGL objects may only be touched by
+ * the UI thread, so the new state is posted here and applied on the next
+ * tick - the same pattern the AI subtitle uses. */
+
+static pthread_mutex_t g_act_lock = PTHREAD_MUTEX_INITIALIZER;
+static bool g_act_pending[UI_NACT];
+static bool g_act_dirty;
+static bool g_pwm_taken;   /* the agent drives PWM2 now */
 static int g_rtc_fd = -1;
 static int g_oled_fd = -1;
 static int g_pwm_fd = -1;
@@ -186,6 +218,31 @@ static int g_pwm_phase;
 static int g_thermal_fd = -1;
 static bool g_adc_ok;
 static bool g_light_ok;
+
+/* AI subtitle state.  The buffers are written from other tasks via
+ * ls_lvgl_set_ai_text(); only the UI loop touches the LVGL objects.
+ */
+
+static pthread_mutex_t g_ai_lock = PTHREAD_MUTEX_INITIALIZER;
+static char g_ai_status[AI_STATUS_LEN];
+static char g_ai_text[AI_TEXT_LEN];
+static volatile bool g_ai_dirty;
+static lv_obj_t *g_ai_status_label;
+static lv_obj_t *g_ai_text_label;
+#ifdef CONFIG_LV_USE_FREETYPE
+static lv_font_t *g_ai_font;
+#endif
+
+static FAR const lv_font_t *ai_font(void)
+{
+#ifdef CONFIG_LV_USE_FREETYPE
+  if (g_ai_font != NULL)
+    {
+      return g_ai_font;
+    }
+#endif
+  return &lv_font_montserrat_20;
+}
 
 /****************************************************************************
  * Private Functions - Actuators
@@ -283,6 +340,17 @@ static void act_pwm_tick(void)
 /* The buzzer just latches; act_buzzer_tick() does the periodic beeping so a
  * long key press never blocks the panel.
  */
+
+/* Put every actuator in its off state.  The GPIO pins keep whatever
+ * level they powered up with, so without this the green LED sits lit
+ * from the moment the panel starts. */
+static void act_all_off(void)
+{
+  act_led_red(false);
+  act_led_green(false);
+  act_pwm(false);
+  act_buzzer(false);
+}
 
 static void act_buzzer(bool on)
 {
@@ -627,11 +695,156 @@ static void ui_build(void)
     {
       ui_make_row(&g_rows[i], (int)i < (int)UI_NACT ? left : right);
     }
+
+  /* AI subtitle panel at the bottom: status line + agent reply text. */
+
+  {
+    lv_obj_t *ai_panel = lv_obj_create(scr);
+    lv_obj_t *ai_caption;
+
+    lv_obj_remove_style_all(ai_panel);
+    lv_obj_set_size(ai_panel, 800 - UI_MARGIN * 2, AI_PANEL_H);
+    lv_obj_set_style_bg_color(ai_panel, lv_color_hex(UI_PANEL_COLOR), 0);
+    lv_obj_set_style_bg_opa(ai_panel, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(ai_panel, 10, 0);
+    lv_obj_set_style_pad_all(ai_panel, 12, 0);
+    lv_obj_set_flex_flow(ai_panel, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(ai_panel, 6, 0);
+
+    ai_caption = lv_label_create(ai_panel);
+    lv_label_set_text(ai_caption, "AI AGENT");
+    lv_obj_set_style_text_color(ai_caption, lv_color_hex(UI_DIM_COLOR), 0);
+    lv_obj_set_style_text_font(ai_caption, &lv_font_montserrat_20, 0);
+
+    g_ai_status_label = lv_label_create(ai_panel);
+    lv_label_set_text(g_ai_status_label, "idle");
+    lv_obj_set_style_text_color(g_ai_status_label,
+                                lv_color_hex(UI_ACCENT_COLOR), 0);
+    lv_obj_set_style_text_font(g_ai_status_label, ai_font(), 0);
+
+    g_ai_text_label = lv_label_create(ai_panel);
+    lv_label_set_text(g_ai_text_label, "");
+    lv_label_set_long_mode(g_ai_text_label, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(g_ai_text_label, 800 - UI_MARGIN * 2 - 24);
+    lv_obj_set_style_text_color(g_ai_text_label,
+                                lv_color_hex(UI_TEXT_COLOR), 0);
+    lv_obj_set_style_text_font(g_ai_text_label, ai_font(), 0);
+  }
 }
 
 /****************************************************************************
  * Public Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: utf8_copy
+ *
+ * Description:
+ *   Copy a UTF-8 string into a fixed buffer without cutting a multi-byte
+ *   character in half.  A truncated 3 byte CJK character leaves invalid
+ *   UTF-8 behind, which LVGL then renders as garbage.
+ *
+ ****************************************************************************/
+
+static void utf8_copy(FAR char *dst, size_t dstlen, FAR const char *src)
+{
+  FAR const char *end;
+  size_t n;
+
+  if (dstlen == 0)
+    {
+      return;
+    }
+
+  if (src == NULL)
+    {
+      dst[0] = '\0';
+      return;
+    }
+
+  n = strlen(src);
+  if (n < dstlen)
+    {
+      memcpy(dst, src, n + 1);
+      return;
+    }
+
+  /* Find the last character boundary that still fits. */
+
+  end = src + dstlen - 1;
+  while (end > src && (((unsigned char)*end & 0xc0) == 0x80))
+    {
+      end--;
+    }
+
+  n = (size_t)(end - src);
+  memcpy(dst, src, n);
+  dst[n] = '\0';
+}
+
+/****************************************************************************
+ * Name: ls_lvgl_set_ai_text
+ *
+ * Description:
+ *   Post an AI agent status and reply text to the panel subtitle.  Safe
+ *   to call from any task (e.g. the ai_agent dispatch thread); the UI
+ *   loop applies the update on its next tick.
+ *
+ * Input Parameters:
+ *   status - Short status string ("thinking", "speaking", ...), or NULL
+ *            to leave the status unchanged.
+ *   text   - Reply text to display, or NULL to clear.
+ *
+ ****************************************************************************/
+
+void ls_lvgl_set_actuator(FAR const char *name, bool on)
+{
+  int i;
+
+  if (name == NULL) {
+    return;
+  }
+
+  pthread_mutex_lock(&g_act_lock);
+
+  for (i = 0; i < UI_NACT; i++)
+    {
+      if (strcmp(g_acts[i].name, name) == 0) {
+        g_act_pending[i] = on;
+        g_act_dirty = true;
+        break;
+      }
+    }
+
+  if (strcmp(name, "PWM BLUE") == 0) {
+    g_pwm_taken = true;
+    g_act_dirty = true;
+  }
+
+  pthread_mutex_unlock(&g_act_lock);
+}
+
+void ls_lvgl_set_ai_text(FAR const char *status, FAR const char *text)
+{
+  pthread_mutex_lock(&g_ai_lock);
+
+  if (status != NULL)
+    {
+      utf8_copy(g_ai_status, AI_STATUS_LEN, status);
+    }
+
+  if (text != NULL)
+    {
+      utf8_copy(g_ai_text, AI_TEXT_LEN, text);
+    }
+  else
+    {
+      g_ai_text[0] = '\0';
+    }
+
+  g_ai_dirty = true;
+  pthread_mutex_unlock(&g_ai_lock);
+}
 
 int main(int argc, FAR char *argv[])
 {
@@ -655,6 +868,87 @@ int main(int argc, FAR char *argv[])
       printf("ERROR: lv_nuttx_init failed (no /dev/fb0?)\n");
       return -ENODEV;
     }
+
+#ifdef CONFIG_LV_USE_FREETYPE
+  /* Optional CJK font for the AI subtitle.  Without the TTF on the card
+   * this fails harmlessly and the subtitle falls back to Montserrat
+   * (ASCII only).  Every failure path says why - a silent fall back here
+   * just looks like "Chinese does not work".
+   */
+
+  /* lv_freetype_init() refuses to run twice and reports that as a failure,
+   * but the context it leaves behind is fully usable.  A NuttX builtin's
+   * statics outlive the task, so a second ls_lvgl in the same boot lands
+   * here - and reusing that context is the right answer: the face ids are
+   * looked up by path, so lv_freetype_font_create() below hits the same
+   * cache node instead of leaking a second one.  Tearing the old context
+   * down instead would free the caches that the labels built by the
+   * previous run still point into, and the next allocation walks a
+   * corrupted heap.
+   */
+
+  if (lv_freetype_init(128) != LV_RESULT_OK)
+    {
+      printf("NOTE: freetype was already initialized, reusing it\n");
+    }
+  else
+    {
+      int font_fd = open(AI_FONT_PATH, O_RDONLY);
+
+      if (font_fd < 0)
+        {
+          printf("WARNING: %s not readable (%d), "
+                 "AI subtitle limited to ASCII\n",
+                 AI_FONT_PATH, errno);
+        }
+      else
+        {
+          off_t font_size = lseek(font_fd, 0, SEEK_END);
+
+          close(font_fd);
+          printf("CJK font: %s, %ld bytes\n",
+                 AI_FONT_PATH, (long)font_size);
+
+          g_ai_font = lv_freetype_font_create(AI_FONT_PATH,
+                                              LV_FREETYPE_FONT_RENDER_MODE_BITMAP,
+                                              20, LV_FREETYPE_FONT_STYLE_NORMAL);
+          if (g_ai_font == NULL)
+            {
+              printf("WARNING: freetype could not load %s, "
+                     "AI subtitle limited to ASCII\n",
+                     AI_FONT_PATH);
+            }
+          else
+            {
+              lv_font_glyph_dsc_t gd;
+
+              printf("CJK font loaded (line_height=%d base_line=%d)\n",
+                     g_ai_font->line_height, g_ai_font->base_line);
+
+              /* A font object that loads is not the same as one that can
+               * draw Chinese: probe a real CJK codepoint so a broken
+               * face is reported as such rather than as garbled text.
+               */
+
+              if (!lv_font_get_glyph_dsc(g_ai_font, &gd,
+                                         (uint32_t)0x4e2d, 0)
+                  || gd.is_placeholder)
+                {
+                  printf("WARNING: font has no glyph for U+4E2D "
+                         "(wrong face or not a CJK font)\n");
+                }
+              else
+                {
+                  printf("CJK glyph ok: adv_w=%d box=%dx%d "
+                         "resolved=%p\n",
+                         (int)gd.adv_w,
+                         (int)gd.box_w, (int)gd.box_h,
+                         (const void *)gd.resolved_font);
+                }
+            }
+        }
+    }
+#endif
 
   ui_build();
 
@@ -708,6 +1002,11 @@ int main(int argc, FAR char *argv[])
       ioctl(g_pwm_fd, PWMIOC_START, 0);
     }
 
+  /* The pins keep the level they powered up with, so start from a known
+   * state: everything off. */
+
+  act_all_off();
+
   /* The OLED is optional -- the console works without it. */
 
   {
@@ -756,6 +1055,11 @@ int main(int argc, FAR char *argv[])
           ui_select(g_selected + 1);
         }
 
+      /* KEY1 is both the row toggle and the microphone key: a tap
+       * toggles the selected row, a hold starts listening and the
+       * release ends the utterance.
+       */
+
       if (now1 && !prev1)
         {
           ui_toggle_selected();
@@ -774,6 +1078,64 @@ int main(int argc, FAR char *argv[])
       if ((tick % 50) == 0)
         {
           ui_sample();
+        }
+
+      /* Apply actuator states posted by the agent's tools. */
+
+      if (g_act_dirty)
+        {
+          bool pending[UI_NACT];
+          bool taken;
+          int i;
+
+          pthread_mutex_lock(&g_act_lock);
+          memcpy(pending, g_act_pending, sizeof(pending));
+          taken = g_pwm_taken;
+          g_act_dirty = false;
+          pthread_mutex_unlock(&g_act_lock);
+
+          for (i = 0; i < UI_NACT; i++)
+            {
+              if (g_state[i] == pending[i]) {
+                continue;
+              }
+
+              g_state[i] = pending[i];
+
+              if (g_rows[i].widget != NULL)
+                {
+                  if (pending[i]) {
+                    lv_obj_add_state(g_rows[i].widget, LV_STATE_CHECKED);
+                  } else {
+                    lv_obj_clear_state(g_rows[i].widget, LV_STATE_CHECKED);
+                  }
+                }
+            }
+
+          /* The agent owns PWM2, so the panel must stop writing the duty
+           * or the two would fight over the breathing animation.
+           */
+
+          if (taken) {
+            g_pwm_on = false;
+          }
+        }
+
+      /* Apply AI subtitle updates posted from other tasks. */
+
+      if (g_ai_dirty)
+        {
+          char status[AI_STATUS_LEN];
+          char text[AI_TEXT_LEN];
+
+          pthread_mutex_lock(&g_ai_lock);
+          memcpy(status, g_ai_status, AI_STATUS_LEN);
+          memcpy(text, g_ai_text, AI_TEXT_LEN);
+          g_ai_dirty = false;
+          pthread_mutex_unlock(&g_ai_lock);
+
+          lv_label_set_text(g_ai_status_label, status);
+          lv_label_set_text(g_ai_text_label, text);
         }
 
       if (g_rtc_fd >= 0 &&
