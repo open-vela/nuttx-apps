@@ -255,12 +255,39 @@ static FAR const lv_font_t *ai_font(void)
  * Private Functions - Actuators
  ****************************************************************************/
 
+/* Switch a pin over to its plain GPIO function through /dev/pinctrl0.
+ * ls_driver_test has its own copy of this helper, but ls_lvgl is a
+ * separate binary and cannot link against it.
+ */
+
+static int pinctrl_select_gpio(int pin)
+{
+  int fd;
+  int ret;
+
+  fd = open("/dev/pinctrl0", O_RDWR);
+  if (fd < 0)
+    {
+      return -errno;
+    }
+
+  ret = ioctl(fd, PINCTRLC_SELECTGPIO, (unsigned long)pin);
+  if (ret < 0)
+    {
+      close(fd);
+      return -errno;
+    }
+
+  close(fd);
+  return 0;
+}
+
 static int act_gpio_open(int pin, bool output)
 {
   char path[32];
   int fd;
 
-  if (pinctrl_set_gpio_function(pin) < 0)
+  if (pinctrl_select_gpio(pin) < 0)
     {
       return -EIO;
     }
@@ -1023,13 +1050,13 @@ int main(int argc, FAR char *argv[])
   g_pwm_fd = open(PWM_DEVICE, O_RDONLY);
   if (g_pwm_fd >= 0)
     {
-      struct pwm_info_s info;
+      struct pwm_info_s pwm_info;
 
-      memset(&info, 0, sizeof(info));
-      info.frequency = PWM_FREQUENCY;
-      info.duty = 0;
+      memset(&pwm_info, 0, sizeof(pwm_info));
+      pwm_info.frequency = PWM_FREQUENCY;
+      pwm_info.duty = 0;
       ioctl(g_pwm_fd, PWMIOC_SETCHARACTERISTICS,
-            (unsigned long)(uintptr_t)&info);
+            (unsigned long)(uintptr_t)&pwm_info);
       ioctl(g_pwm_fd, PWMIOC_START, 0);
     }
 
