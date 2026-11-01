@@ -37,7 +37,7 @@ static void show_usage(FAR const char *progname)
 {
   printf("Usage: %s [test]\n", progname);
   printf("  test options:\n");
-  printf("    led       - Test LED (GPIO%d, active-low)\n", LED_GPIO_PIN);
+  printf("    led       - Test LED (GPIO%d, high=ON)\n", LED_GPIO_PIN);
   printf("    oled      - Test SSD1306 OLED (I2C1, addr=0x3C)\n");
   printf("    key       - Test Key (GPIO%d)\n", KEY_GPIO_PIN);
   printf("    thermal   - Test thermal sensor\n");

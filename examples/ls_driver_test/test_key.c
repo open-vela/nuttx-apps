@@ -84,9 +84,9 @@ static int init_led_gpio(int gpio)
       return -errno;
     }
 
-  /* LED off (high = off for active-low) */
+  /* LED off (low = off, LEDs light on high level) */
 
-  ioctl(fd, GPIOC_WRITE, 1);
+  ioctl(fd, GPIOC_WRITE, 0);
   return fd;
 }
 
@@ -154,9 +154,9 @@ static int is_key_pressed(key_state_s *key)
 
 static void set_led(int fd, int on)
 {
-  /* Active-low: 0 = ON, 1 = OFF */
+  /* LEDs light on high level: 1 = ON, 0 = OFF */
 
-  ioctl(fd, GPIOC_WRITE, on ? 0 : 1);
+  ioctl(fd, GPIOC_WRITE, on ? 1 : 0);
 }
 
 /****************************************************************************

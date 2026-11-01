@@ -66,7 +66,7 @@ int test_led(void)
   int j;
   int ok = 0;
 
-  printf("[LED] Testing %d LEDs (active-low)...\n", LED_COUNT);
+  printf("[LED] Testing %d LEDs (high=ON)...\n", LED_COUNT);
 
   /* Initialize all LEDs */
 
@@ -109,30 +109,12 @@ int test_led(void)
       ok++;
     }
 
-  printf("[LED] Blinking all %d LEDs 3 times (low=ON, high=OFF)...\n",
+  printf("[LED] Blinking all %d LEDs 3 times (high=ON, low=OFF)...\n",
          LED_COUNT);
 
   for (i = 0; i < 3; i++)
     {
       /* Turn all LEDs ON */
-
-      for (j = 0; j < LED_COUNT; j++)
-        {
-          ret = ioctl(fds[j], GPIOC_WRITE, 0);
-          if (ret < 0)
-            {
-              printf("[LED] ERROR: GPIOC_WRITE(0) failed on GPIO%d: %d\n",
-                     led_pins[j], errno);
-            }
-          else
-            {
-              printf("[LED] LED ON (GPIO%d=LOW)\n", led_pins[j]);
-            }
-        }
-
-      up_mdelay(500);
-
-      /* Turn all LEDs OFF */
 
       for (j = 0; j < LED_COUNT; j++)
         {
@@ -144,7 +126,25 @@ int test_led(void)
             }
           else
             {
-              printf("[LED] LED OFF (GPIO%d=HIGH)\n", led_pins[j]);
+              printf("[LED] LED ON (GPIO%d=HIGH)\n", led_pins[j]);
+            }
+        }
+
+      up_mdelay(500);
+
+      /* Turn all LEDs OFF */
+
+      for (j = 0; j < LED_COUNT; j++)
+        {
+          ret = ioctl(fds[j], GPIOC_WRITE, 0);
+          if (ret < 0)
+            {
+              printf("[LED] ERROR: GPIOC_WRITE(0) failed on GPIO%d: %d\n",
+                     led_pins[j], errno);
+            }
+          else
+            {
+              printf("[LED] LED OFF (GPIO%d=LOW)\n", led_pins[j]);
             }
         }
 
@@ -155,15 +155,15 @@ int test_led(void)
 
   for (j = 0; j < LED_COUNT; j++)
     {
-      ret = ioctl(fds[j], GPIOC_WRITE, 1);
+      ret = ioctl(fds[j], GPIOC_WRITE, 0);
       if (ret < 0)
         {
-          printf("[LED] ERROR: GPIOC_WRITE(1) final failed on GPIO%d: %d\n",
+          printf("[LED] ERROR: GPIOC_WRITE(0) final failed on GPIO%d: %d\n",
                  led_pins[j], errno);
         }
       else
         {
-          printf("[LED] LED left OFF (GPIO%d=HIGH)\n", led_pins[j]);
+          printf("[LED] LED left OFF (GPIO%d=LOW)\n", led_pins[j]);
         }
     }
 
