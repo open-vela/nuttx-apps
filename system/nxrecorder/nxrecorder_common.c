@@ -26,9 +26,11 @@
 
 #include <assert.h>
 #include <debug.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <nuttx/audio/audio.h>
@@ -60,7 +62,8 @@ int nxrecorder_write_common(int fd, FAR struct ap_buffer_s *apb)
   ret = write(fd, apb->samp, apb->nbytes);
   if (ret < 0)
     {
-      auderr("ERROR: precorder write failed: %d\n", ret);
+      auderr("ERROR: precorder write failed: %d, errno=%d (%s)\n",
+             ret, errno, strerror(errno));
     }
 
   return ret;
