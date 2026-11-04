@@ -1,0 +1,10 @@
+############################################################################
+# apps/examples/ls_lvgl/Make.defs
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+############################################################################
+
+ifneq ($(CONFIG_EXAMPLES_LS_LVGL),)
+CONFIGURED_APPS += $(APPDIR)/examples/ls_lvgl
+endif

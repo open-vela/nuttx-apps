@@ -1,0 +1,24 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+menuconfig EXAMPLES_LS_LVGL
+	tristate "LS2K0300 device status console (LVGL)"
+	default n
+	depends on GRAPHICS_LVGL
+	---help---
+		Two-column device status console for the LS2K0300 RGB panel.
+		Actuators on the left, sampled values on the right.
+
+if EXAMPLES_LS_LVGL
+
+config EXAMPLES_LS_LVGL_PRIORITY
+	int "ls_lvgl task priority"
+	default 100
+
+config EXAMPLES_LS_LVGL_STACKSIZE
+	int "ls_lvgl stack size"
+	default 32768
+
+endif # EXAMPLES_LS_LVGL
