@@ -127,6 +127,12 @@
 #define AI_TEXT_LINES     2
 #define AI_PANEL_H        96
 
+/* Width of the "AI AGENT / <status>" column inside the panel; the reply
+ * text takes whatever is left, which is enough for two lines. */
+
+#define AI_STATUS_W       180
+#define AI_TEXT_W         (800 - UI_MARGIN * 2 - 24 - AI_STATUS_W - 12)
+
 /* Optional CJK font for the subtitle.  Without this file on the SD card
  * the subtitle falls back to Montserrat (ASCII only).  Copy
  * packages/demos/calculator/res/fonts/MiSans-Normal.ttf (or any CJK
@@ -216,6 +222,10 @@ static pthread_mutex_t g_act_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool g_act_pending[UI_NACT];
 static bool g_act_dirty;
 static bool g_pwm_taken;   /* the agent drives PWM2 now */
+static bool g_pwm_force;   /* start/stop the ramp even if the row state
+                            * is already the requested one */
+static bool g_buzz_force;  /* apply the buzzer row even if the state is
+                            * already the requested one */
 static int g_rtc_fd = -1;
 static int g_oled_fd = -1;
 static int g_pwm_fd = -1;
@@ -225,6 +235,15 @@ static int g_pwm_phase;
 static int g_thermal_fd = -1;
 static bool g_adc_ok;
 static bool g_light_ok;
+
+/* Last sensor samples, published for the agent's board tools: the panel
+ * owns /dev/thermal0 (exclusive open) and the sensor I2C bus, so the
+ * tools read these instead of opening the devices a second time. */
+
+static volatile int32_t g_thermal_milli;
+static volatile bool g_thermal_valid;
+static volatile unsigned int g_light_lux_x100;
+static volatile bool g_light_valid;
 
 /* AI subtitle state.  The buffers are written from other tasks via
  * ls_lvgl_set_ai_text(); only the UI loop touches the LVGL objects.
@@ -345,6 +364,16 @@ static void act_pwm(bool on)
   info.frequency = PWM_FREQUENCY;
   info.duty = on ? (PWM_DUTY_MAX / 2) : 0;
   ioctl(g_pwm_fd, PWMIOC_SETCHARACTERISTICS, (unsigned long)(uintptr_t)&info);
+
+  /* SETCHARACTERISTICS only reaches the hardware while a session is
+   * marked started.  The agent's stop path clears the duty without
+   * stopping the timer for exactly that reason, but start it here
+   * anyway so turning the row on always produces output. */
+
+  if (on)
+    {
+      ioctl(g_pwm_fd, PWMIOC_START, (unsigned long)(uintptr_t)&info);
+    }
 }
 
 /* Triangle ramp, applied once per tick while breathing is enabled. */
@@ -439,6 +468,9 @@ static void ui_sample(void)
     {
       snprintf(g_rows[ROW_TEMP].value_buf, UI_VALUE_LEN, "%d.%dC",
                (int)(milli / 1000), (int)(abs(milli % 1000) / 100));
+
+      g_thermal_milli = milli;
+      g_thermal_valid = true;
     }
 
   if (g_adc_ok && mcp3204_read_average(0, &raw) == 0)
@@ -451,6 +483,9 @@ static void ui_sample(void)
     {
       snprintf(g_rows[ROW_LIGHT].value_buf, UI_VALUE_LEN, "%u.%02ulx",
                lux_x100 / 100, lux_x100 % 100);
+
+      g_light_lux_x100 = lux_x100;
+      g_light_valid = true;
     }
 
   lv_label_set_text(g_rows[ROW_ADC].widget, g_rows[ROW_ADC].value_buf);
@@ -730,10 +765,13 @@ static void ui_build(void)
       ui_make_row(&g_rows[i], (int)i < (int)UI_NACT ? left : right);
     }
 
-  /* AI subtitle panel at the bottom: status line + agent reply text. */
+  /* AI subtitle panel at the bottom.  "AI AGENT / <status>" sits on the
+   * left and the reply on the right, so the reply gets the whole panel
+   * height for two lines instead of one. */
 
   {
     lv_obj_t *ai_panel = lv_obj_create(scr);
+    lv_obj_t *ai_left;
     lv_obj_t *ai_caption;
 
     lv_obj_remove_style_all(ai_panel);
@@ -742,15 +780,23 @@ static void ui_build(void)
     lv_obj_set_style_bg_opa(ai_panel, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(ai_panel, 10, 0);
     lv_obj_set_style_pad_all(ai_panel, 12, 0);
-    lv_obj_set_flex_flow(ai_panel, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(ai_panel, 6, 0);
+    lv_obj_set_flex_flow(ai_panel, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(ai_panel, LV_FLEX_ALIGN_START,
+                          LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
+    lv_obj_set_style_pad_column(ai_panel, 12, 0);
 
-    ai_caption = lv_label_create(ai_panel);
+    ai_left = lv_obj_create(ai_panel);
+    lv_obj_remove_style_all(ai_left);
+    lv_obj_set_size(ai_left, AI_STATUS_W, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(ai_left, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(ai_left, 6, 0);
+
+    ai_caption = lv_label_create(ai_left);
     lv_label_set_text(ai_caption, "AI AGENT");
     lv_obj_set_style_text_color(ai_caption, lv_color_hex(UI_DIM_COLOR), 0);
     lv_obj_set_style_text_font(ai_caption, &lv_font_montserrat_20, 0);
 
-    g_ai_status_label = lv_label_create(ai_panel);
+    g_ai_status_label = lv_label_create(ai_left);
     lv_label_set_text(g_ai_status_label, "idle");
     lv_obj_set_style_text_color(g_ai_status_label,
                                 lv_color_hex(UI_ACCENT_COLOR), 0);
@@ -759,7 +805,9 @@ static void ui_build(void)
     g_ai_text_label = lv_label_create(ai_panel);
     lv_label_set_text(g_ai_text_label, "");
     lv_label_set_long_mode(g_ai_text_label, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(g_ai_text_label, 800 - UI_MARGIN * 2 - 24);
+    lv_obj_set_width(g_ai_text_label, AI_TEXT_W);
+    lv_obj_set_height(g_ai_text_label,
+                      2 * lv_font_get_line_height(ai_font()));
     lv_obj_set_style_text_color(g_ai_text_label,
                                 lv_color_hex(UI_TEXT_COLOR), 0);
     lv_obj_set_style_text_font(g_ai_text_label, ai_font(), 0);
@@ -878,6 +926,60 @@ void ls_lvgl_set_actuator(FAR const char *name, bool on)
   }
 
   pthread_mutex_unlock(&g_act_lock);
+}
+
+/* Run the PWM BLUE breathing animation on the panel, exactly as if the
+ * row had been toggled with KEY1.  Called from the agent's board_pwm
+ * tool: the panel already owns PWM2 and ramps the duty on its own tick,
+ * so the agent has nothing left to do but return. */
+
+void ls_lvgl_set_pwm_breath(bool on)
+{
+  pthread_mutex_lock(&g_act_lock);
+  g_act_pending[ACT_PWM] = on;
+  g_pwm_taken = false;
+  g_pwm_force = true;
+  g_act_dirty = true;
+  pthread_mutex_unlock(&g_act_lock);
+}
+
+/* Switch the BUZZER row on or off, exactly as if KEY1 had been tapped on
+ * it.  The panel beeps the buzzer from its own UI tick, so an alarm
+ * request from the agent returns immediately. */
+
+void ls_lvgl_set_buzzer(bool on)
+{
+  pthread_mutex_lock(&g_act_lock);
+  g_act_pending[ACT_BUZZER] = on;
+  g_buzz_force = true;
+  g_act_dirty = true;
+  pthread_mutex_unlock(&g_act_lock);
+}
+
+/* The panel holds /dev/thermal0 (the driver allows a single open) and the
+ * sensor I2C bus, so the agent's board tools read the samples the panel
+ * already takes once a second instead of opening the devices themselves. */
+
+int ls_lvgl_read_thermal(int32_t *milli_c)
+{
+  if (!g_thermal_valid)
+    {
+      return -ENODATA;
+    }
+
+  *milli_c = g_thermal_milli;
+  return 0;
+}
+
+int ls_lvgl_read_light(unsigned int *lux_x100)
+{
+  if (!g_light_valid)
+    {
+      return -ENODATA;
+    }
+
+  *lux_x100 = g_light_lux_x100;
+  return 0;
 }
 
 void ls_lvgl_set_ai_text(FAR const char *status, FAR const char *text)
@@ -1149,16 +1251,26 @@ int main(int argc, FAR char *argv[])
       prev1 = now1;
       prev2 = now2;
 
-      act_pwm_tick();
-      act_buzzer_tick(tick++);
+      /* While the microphone is recording, keep the panel quiet.  Every
+       * tick of PWM/sensor work and every LVGL refresh is bus and CPU
+       * time the 2-frame I2S RX FIFO cannot spare, and there is nothing
+       * to show but the "listening" text.  The key is still polled, just
+       * at 50 ms, which is well inside one recording buffer. */
 
-      /* Values refresh every 50 ticks (1 s); the RTC is cheap enough to
-       * follow every tick.
-       */
-
-      if ((tick % 50) == 0)
+      if (!ptt_active)
         {
-          ui_sample();
+          act_pwm_tick();
+          act_buzzer_tick(tick++);
+
+          /* Values refresh every 50 ticks (1 s).  The RTC is polled more
+           * often (every 16 ticks, ~3 Hz) so a new second shows up within
+           * a single tick of the hardware; the label is only rewritten
+           * when the text changes. */
+
+          if ((tick % 50) == 0)
+            {
+              ui_sample();
+            }
         }
 
       /* Apply actuator states posted by the agent's tools. */
@@ -1167,11 +1279,19 @@ int main(int argc, FAR char *argv[])
         {
           bool pending[UI_NACT];
           bool taken;
+          bool force;
+          bool buzz_force;
+          bool pwm_changed = false;
+          bool buzz_changed = false;
           int i;
 
           pthread_mutex_lock(&g_act_lock);
           memcpy(pending, g_act_pending, sizeof(pending));
           taken = g_pwm_taken;
+          force = g_pwm_force;
+          g_pwm_force = false;
+          buzz_force = g_buzz_force;
+          g_buzz_force = false;
           g_act_dirty = false;
           pthread_mutex_unlock(&g_act_lock);
 
@@ -1183,6 +1303,14 @@ int main(int argc, FAR char *argv[])
 
               g_state[i] = pending[i];
 
+              if (i == ACT_PWM) {
+                pwm_changed = true;
+              }
+
+              if (i == ACT_BUZZER) {
+                buzz_changed = true;
+              }
+
               if (g_rows[i].widget != NULL)
                 {
                   if (pending[i]) {
@@ -1193,8 +1321,29 @@ int main(int argc, FAR char *argv[])
                 }
             }
 
-          /* The agent owns PWM2, so the panel must stop writing the duty
-           * or the two would fight over the breathing animation.
+          /* PWM BLUE: start or stop the panel's own breathing ramp, the
+           * same thing a KEY1 toggle on that row does.  `force` covers
+           * the case where the row is already on (a static duty set the
+           * state a moment ago) but the request is for the animation.
+           * When `taken` is set the agent drives PWM2 itself for a static
+           * duty, so the hardware must be left alone -- running act_pwm
+           * here would replace that duty with the 50% ramp step and leave
+           * a 1 kHz square wave on the LED.
+           */
+
+          if ((pwm_changed || force) && !taken) {
+            act_pwm(g_state[ACT_PWM]);
+          }
+
+          /* BUZZER: the panel owns the beep pattern (act_buzzer_tick),
+           * so switching the row is all the agent has to ask for. */
+
+          if (buzz_changed || buzz_force) {
+            act_buzzer(g_state[ACT_BUZZER]);
+          }
+
+          /* The agent owns PWM2 for a static duty, so the panel must
+           * stop writing the duty or the two would fight.
            */
 
           if (taken) {
@@ -1219,19 +1368,32 @@ int main(int argc, FAR char *argv[])
           lv_label_set_text(g_ai_text_label, text);
         }
 
-      if (g_rtc_fd >= 0 &&
+      if (!ptt_active && (tick % 16) == 0 && g_rtc_fd >= 0 &&
           ioctl(g_rtc_fd, RTC_RD_TIME,
                 (unsigned long)(uintptr_t)&rtctime) == 0)
         {
-          snprintf(g_rows[UI_NROWS - 1].value_buf, UI_VALUE_LEN,
-                   "%02d:%02d:%02d",
+          char now[UI_VALUE_LEN];
+
+          snprintf(now, sizeof(now), "%02d:%02d:%02d",
                    rtctime.tm_hour, rtctime.tm_min, rtctime.tm_sec);
-          lv_label_set_text(g_rows[UI_NROWS - 1].widget,
-                            g_rows[UI_NROWS - 1].value_buf);
+
+          /* lv_label_set_text() invalidates the object before it looks at
+           * the string, so passing the same value every poll makes LVGL
+           * redraw this row straight into the uncached framebuffer.  That
+           * bus traffic alone was enough to overrun the 2-frame I2S RX
+           * FIFO while recording.  Only touch the label when the displayed
+           * text actually changes.
+           */
+
+          if (strcmp(now, g_rows[UI_NROWS - 1].value_buf) != 0)
+            {
+              memcpy(g_rows[UI_NROWS - 1].value_buf, now, sizeof(now));
+              lv_label_set_text(g_rows[UI_NROWS - 1].widget, now);
+            }
         }
 
       lv_timer_handler();
-      usleep(TICK_MS * 1000);
+      usleep((ptt_active ? 50 : TICK_MS) * 1000);
     }
 
   /* Not reached. */
