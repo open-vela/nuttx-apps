@@ -128,7 +128,8 @@
 #define AI_PANEL_H        96
 
 /* Width of the "AI AGENT / <status>" column inside the panel; the reply
- * text takes whatever is left, which is enough for two lines. */
+ * text takes whatever is left, which is enough for two lines.
+ */
 
 #define AI_STATUS_W       180
 #define AI_TEXT_W         (800 - UI_MARGIN * 2 - 24 - AI_STATUS_W - 12)
@@ -216,16 +217,19 @@ static bool g_state[UI_NACT];
 /* Actuator states posted by the agent's board tools.  The tools change the
  * hardware from their own thread, and LVGL objects may only be touched by
  * the UI thread, so the new state is posted here and applied on the next
- * tick - the same pattern the AI subtitle uses. */
+ * tick - the same pattern the AI subtitle uses.
+ */
 
 static pthread_mutex_t g_act_lock = PTHREAD_MUTEX_INITIALIZER;
 static bool g_act_pending[UI_NACT];
 static bool g_act_dirty;
 static bool g_pwm_taken;   /* the agent drives PWM2 now */
 static bool g_pwm_force;   /* start/stop the ramp even if the row state
-                            * is already the requested one */
+                            * is already the requested one
+                            */
 static bool g_buzz_force;  /* apply the buzzer row even if the state is
-                            * already the requested one */
+                            * already the requested one
+                            */
 static int g_rtc_fd = -1;
 static int g_oled_fd = -1;
 static int g_pwm_fd = -1;
@@ -238,7 +242,8 @@ static bool g_light_ok;
 
 /* Last sensor samples, published for the agent's board tools: the panel
  * owns /dev/thermal0 (exclusive open) and the sensor I2C bus, so the
- * tools read these instead of opening the devices a second time. */
+ * tools read these instead of opening the devices a second time.
+ */
 
 static volatile int32_t g_thermal_milli;
 static volatile bool g_thermal_valid;
@@ -363,12 +368,14 @@ static void act_pwm(bool on)
   memset(&info, 0, sizeof(info));
   info.frequency = PWM_FREQUENCY;
   info.duty = on ? (PWM_DUTY_MAX / 2) : 0;
-  ioctl(g_pwm_fd, PWMIOC_SETCHARACTERISTICS, (unsigned long)(uintptr_t)&info);
+  ioctl(g_pwm_fd, PWMIOC_SETCHARACTERISTICS,
+        (unsigned long)(uintptr_t)&info);
 
   /* SETCHARACTERISTICS only reaches the hardware while a session is
    * marked started.  The agent's stop path clears the duty without
    * stopping the timer for exactly that reason, but start it here
-   * anyway so turning the row on always produces output. */
+   * anyway so turning the row on always produces output.
+   */
 
   if (on)
     {
@@ -397,7 +404,8 @@ static void act_pwm_tick(void)
   memset(&info, 0, sizeof(info));
   info.frequency = PWM_FREQUENCY;
   info.duty = (uint32_t)pct * PWM_DUTY_MAX / 100;
-  ioctl(g_pwm_fd, PWMIOC_SETCHARACTERISTICS, (unsigned long)(uintptr_t)&info);
+  ioctl(g_pwm_fd, PWMIOC_SETCHARACTERISTICS,
+        (unsigned long)(uintptr_t)&info);
 }
 
 /* The buzzer just latches; act_buzzer_tick() does the periodic beeping so a
@@ -406,7 +414,9 @@ static void act_pwm_tick(void)
 
 /* Put every actuator in its off state.  The GPIO pins keep whatever
  * level they powered up with, so without this the green LED sits lit
- * from the moment the panel starts. */
+ * from the moment the panel starts.
+ */
+
 static void act_all_off(void)
 {
   act_led_red(false);
@@ -531,7 +541,12 @@ static int lvoled_xfer(FAR const uint8_t *data, int len)
 
 static int lvoled_cmd(uint8_t cmd)
 {
-  uint8_t buf[2] = { OLED_CTRL_CMD, cmd };
+  uint8_t buf[2] =
+  {
+    OLED_CTRL_CMD,
+    cmd
+  };
+
   return lvoled_xfer(buf, 2);
 }
 
@@ -767,7 +782,8 @@ static void ui_build(void)
 
   /* AI subtitle panel at the bottom.  "AI AGENT / <status>" sits on the
    * left and the reply on the right, so the reply gets the whole panel
-   * height for two lines instead of one. */
+   * height for two lines instead of one.
+   */
 
   {
     lv_obj_t *ai_panel = lv_obj_create(scr);
@@ -905,25 +921,28 @@ void ls_lvgl_set_actuator(FAR const char *name, bool on)
 {
   int i;
 
-  if (name == NULL) {
-    return;
-  }
+  if (name == NULL)
+    {
+      return;
+    }
 
   pthread_mutex_lock(&g_act_lock);
 
   for (i = 0; i < UI_NACT; i++)
     {
-      if (strcmp(g_acts[i].name, name) == 0) {
-        g_act_pending[i] = on;
-        g_act_dirty = true;
-        break;
-      }
+      if (strcmp(g_acts[i].name, name) == 0)
+        {
+          g_act_pending[i] = on;
+          g_act_dirty = true;
+          break;
+        }
     }
 
-  if (strcmp(name, "PWM BLUE") == 0) {
-    g_pwm_taken = true;
-    g_act_dirty = true;
-  }
+  if (strcmp(name, "PWM BLUE") == 0)
+    {
+      g_pwm_taken = true;
+      g_act_dirty = true;
+    }
 
   pthread_mutex_unlock(&g_act_lock);
 }
@@ -931,7 +950,8 @@ void ls_lvgl_set_actuator(FAR const char *name, bool on)
 /* Run the PWM BLUE breathing animation on the panel, exactly as if the
  * row had been toggled with KEY1.  Called from the agent's board_pwm
  * tool: the panel already owns PWM2 and ramps the duty on its own tick,
- * so the agent has nothing left to do but return. */
+ * so the agent has nothing left to do but return.
+ */
 
 void ls_lvgl_set_pwm_breath(bool on)
 {
@@ -945,7 +965,8 @@ void ls_lvgl_set_pwm_breath(bool on)
 
 /* Switch the BUZZER row on or off, exactly as if KEY1 had been tapped on
  * it.  The panel beeps the buzzer from its own UI tick, so an alarm
- * request from the agent returns immediately. */
+ * request from the agent returns immediately.
+ */
 
 void ls_lvgl_set_buzzer(bool on)
 {
@@ -958,7 +979,8 @@ void ls_lvgl_set_buzzer(bool on)
 
 /* The panel holds /dev/thermal0 (the driver allows a single open) and the
  * sensor I2C bus, so the agent's board tools read the samples the panel
- * already takes once a second instead of opening the devices themselves. */
+ * already takes once a second instead of opening the devices themselves.
+ */
 
 int ls_lvgl_read_thermal(int32_t *milli_c)
 {
@@ -1008,6 +1030,8 @@ int main(int argc, FAR char *argv[])
 {
   lv_nuttx_dsc_t info;
   lv_nuttx_result_t result;
+  struct pinctrl_param_s param;
+  int pfd;
   int key1;
   int key2;
   int tick = 0;
@@ -1069,9 +1093,10 @@ int main(int argc, FAR char *argv[])
           printf("CJK font: %s, %ld bytes\n",
                  AI_FONT_PATH, (long)font_size);
 
-          g_ai_font = lv_freetype_font_create(AI_FONT_PATH,
-                                              LV_FREETYPE_FONT_RENDER_MODE_BITMAP,
-                                              20, LV_FREETYPE_FONT_STYLE_NORMAL);
+          g_ai_font =
+            lv_freetype_font_create(AI_FONT_PATH,
+                                    LV_FREETYPE_FONT_RENDER_MODE_BITMAP, 20,
+                                    LV_FREETYPE_FONT_STYLE_NORMAL);
           if (g_ai_font == NULL)
             {
               printf("WARNING: freetype could not load %s, "
@@ -1135,19 +1160,15 @@ int main(int argc, FAR char *argv[])
 
   /* PWM2 on GPIO88: mux the pin to its alternate function and start. */
 
-  {
-    struct pinctrl_param_s param;
-    int pfd = open("/dev/pinctrl0", O_RDWR);
-
-    if (pfd >= 0)
-      {
-        memset(&param, 0, sizeof(param));
-        param.pin = PWM_GPIO;
-        param.para.function = PWM_FUNCTION;
-        ioctl(pfd, PINCTRLC_SETFUNCTION, (unsigned long)(uintptr_t)&param);
-        close(pfd);
-      }
-  }
+  pfd = open("/dev/pinctrl0", O_RDWR);
+  if (pfd >= 0)
+    {
+      memset(&param, 0, sizeof(param));
+      param.pin = PWM_GPIO;
+      param.para.function = PWM_FUNCTION;
+      ioctl(pfd, PINCTRLC_SETFUNCTION, (unsigned long)(uintptr_t)&param);
+      close(pfd);
+    }
 
   g_pwm_fd = open(PWM_DEVICE, O_RDONLY);
   if (g_pwm_fd >= 0)
@@ -1163,27 +1184,24 @@ int main(int argc, FAR char *argv[])
     }
 
   /* The pins keep the level they powered up with, so start from a known
-   * state: everything off. */
+   * state: everything off.
+   */
 
   act_all_off();
 
   /* The OLED is optional -- the console works without it. */
 
-  {
-    struct pinctrl_param_s param;
-    int pfd = open("/dev/pinctrl0", O_RDWR);
-
-    if (pfd >= 0)
-      {
-        memset(&param, 0, sizeof(param));
-        param.pin = 50;
-        param.para.function = 3;
-        ioctl(pfd, PINCTRLC_SETFUNCTION, (unsigned long)(uintptr_t)&param);
-        param.pin = 51;
-        ioctl(pfd, PINCTRLC_SETFUNCTION, (unsigned long)(uintptr_t)&param);
-        close(pfd);
-      }
-  }
+  pfd = open("/dev/pinctrl0", O_RDWR);
+  if (pfd >= 0)
+    {
+      memset(&param, 0, sizeof(param));
+      param.pin = 50;
+      param.para.function = 3;
+      ioctl(pfd, PINCTRLC_SETFUNCTION, (unsigned long)(uintptr_t)&param);
+      param.pin = 51;
+      ioctl(pfd, PINCTRLC_SETFUNCTION, (unsigned long)(uintptr_t)&param);
+      close(pfd);
+    }
 
   g_oled_fd = open(OLED_I2C_PATH, O_RDWR);
   if (g_oled_fd >= 0)
@@ -1255,7 +1273,8 @@ int main(int argc, FAR char *argv[])
        * tick of PWM/sensor work and every LVGL refresh is bus and CPU
        * time the 2-frame I2S RX FIFO cannot spare, and there is nothing
        * to show but the "listening" text.  The key is still polled, just
-       * at 50 ms, which is well inside one recording buffer. */
+       * at 50 ms, which is well inside one recording buffer.
+       */
 
       if (!ptt_active)
         {
@@ -1265,7 +1284,8 @@ int main(int argc, FAR char *argv[])
           /* Values refresh every 50 ticks (1 s).  The RTC is polled more
            * often (every 16 ticks, ~3 Hz) so a new second shows up within
            * a single tick of the hardware; the label is only rewritten
-           * when the text changes. */
+           * when the text changes.
+           */
 
           if ((tick % 50) == 0)
             {
@@ -1297,27 +1317,33 @@ int main(int argc, FAR char *argv[])
 
           for (i = 0; i < UI_NACT; i++)
             {
-              if (g_state[i] == pending[i]) {
-                continue;
-              }
+              if (g_state[i] == pending[i])
+                {
+                  continue;
+                }
 
               g_state[i] = pending[i];
 
-              if (i == ACT_PWM) {
-                pwm_changed = true;
-              }
+              if (i == ACT_PWM)
+                {
+                  pwm_changed = true;
+                }
 
-              if (i == ACT_BUZZER) {
-                buzz_changed = true;
-              }
+              if (i == ACT_BUZZER)
+                {
+                  buzz_changed = true;
+                }
 
               if (g_rows[i].widget != NULL)
                 {
-                  if (pending[i]) {
-                    lv_obj_add_state(g_rows[i].widget, LV_STATE_CHECKED);
-                  } else {
-                    lv_obj_clear_state(g_rows[i].widget, LV_STATE_CHECKED);
-                  }
+                  if (pending[i])
+                    {
+                      lv_obj_add_state(g_rows[i].widget, LV_STATE_CHECKED);
+                    }
+                  else
+                    {
+                      lv_obj_clear_state(g_rows[i].widget, LV_STATE_CHECKED);
+                    }
                 }
             }
 
@@ -1331,24 +1357,28 @@ int main(int argc, FAR char *argv[])
            * a 1 kHz square wave on the LED.
            */
 
-          if ((pwm_changed || force) && !taken) {
-            act_pwm(g_state[ACT_PWM]);
-          }
+          if ((pwm_changed || force) && !taken)
+            {
+              act_pwm(g_state[ACT_PWM]);
+            }
 
           /* BUZZER: the panel owns the beep pattern (act_buzzer_tick),
-           * so switching the row is all the agent has to ask for. */
+           * so switching the row is all the agent has to ask for.
+           */
 
-          if (buzz_changed || buzz_force) {
-            act_buzzer(g_state[ACT_BUZZER]);
-          }
+          if (buzz_changed || buzz_force)
+            {
+              act_buzzer(g_state[ACT_BUZZER]);
+            }
 
           /* The agent owns PWM2 for a static duty, so the panel must
            * stop writing the duty or the two would fight.
            */
 
-          if (taken) {
-            g_pwm_on = false;
-          }
+          if (taken)
+            {
+              g_pwm_on = false;
+            }
         }
 
       /* Apply AI subtitle updates posted from other tasks. */

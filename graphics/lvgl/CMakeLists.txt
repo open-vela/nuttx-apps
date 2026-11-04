@@ -92,8 +92,8 @@ if(CONFIG_GRAPHICS_LVGL)
 
   # ArtInChip GE2D / MPP backends; they need mpp_types.h and the ArtInChip MPP
   # headers, which are absent on non-ArtInChip targets.  Unlike the backends
-  # above these .c files carry no #if LV_USE_DRAW_GE2D guard, so they have to
-  # be filtered out here or the build dies on a missing include.
+  # above these .c files carry no #if LV_USE_DRAW_GE2D guard, so they have to be
+  # filtered out here or the build dies on a missing include.
   if(NOT CONFIG_LV_USE_DRAW_GE2D)
     list(FILTER SRCS EXCLUDE REGEX "/draw/artinchip/ge2d/.*\\.(c|cpp)$")
   endif()

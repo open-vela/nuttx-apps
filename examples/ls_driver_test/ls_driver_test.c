@@ -50,7 +50,8 @@ static void show_usage(FAR const char *progname)
   printf("    buzzer    - Buzzer (GPIO%d) with KEY control\n", 75);
   printf("    spiflash  - SPI Flash + ADC (KEY1: read/save, KEY2: exit)\n");
   printf("    uart2     - UART2 echo (GPIO44 TX / GPIO45 RX)\n");
-  printf("    lcd       - LCD LED status panel (lcd [period_ms] | lcd dump)\n");
+  printf("    lcd       - LCD LED status panel "
+         "(lcd [period_ms] | lcd dump)\n");
   printf("    all       - Run all tests (default)\n");
 }
 
