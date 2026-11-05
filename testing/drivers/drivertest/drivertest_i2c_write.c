@@ -66,13 +66,7 @@ struct i2c_state_s
   int slave_fd;
 };
 
-static struct i2c_state_s g_i2cwrite =
-{
-  .pathname_master = GET_I2C_MASTER_PATH,
-  .pathname_slave = GET_I2C_SLAVE_PATH,
-  .addr = GET_I2C_SLAVE_ADDR,
-  .frequency = GET_I2C_FRE,
-};
+static struct i2c_state_s *g_i2cwrite;
 
 /****************************************************************************
  * Private Functions
@@ -91,8 +85,8 @@ static void i2c_information(FAR struct i2c_state_s *i2c_state)
          "  Default: %s Current: %s\n",
          GET_I2C_SLAVE_PATH, i2c_state->pathname_slave);
   printf("  [frequency] selects the I2C frequency.\n"
-         "  Default: %d Current: %ld\n",
-         GET_I2C_FRE, i2c_state->frequency);
+         "  Default: %d Current: %lu\n",
+         GET_I2C_FRE, (unsigned long)i2c_state->frequency);
   printf("  [slaveAddress] the address of i2c Slave, Convert to decimal.\n"
          "  Default: %d Current: %d\n",
          GET_I2C_SLAVE_ADDR, i2c_state->addr);
@@ -190,11 +184,11 @@ static int master_write_i2c(int fd, int num)
       buffer[i] = i + num;
     }
 
-  i2c_msg[0].addr = g_i2cwrite.addr;
+  i2c_msg[0].addr = g_i2cwrite->addr;
   i2c_msg[0].flags = 0;
   i2c_msg[0].buffer = buffer;
   i2c_msg[0].length = SIZE_OF_BUFFER;
-  i2c_msg[0].frequency = g_i2cwrite.frequency;
+  i2c_msg[0].frequency = g_i2cwrite->frequency;
 
   i2c_transfer.msgv = (struct i2c_msg_s *)i2c_msg;
   i2c_transfer.msgc = 1;
@@ -227,7 +221,7 @@ static FAR void *slave_read_thread(FAR void *arg)
   int size;
   int i;
 
-  rfds.fd = g_i2cwrite.slave_fd;
+  rfds.fd = g_i2cwrite->slave_fd;
   rfds.events = POLLIN;
   rfds.revents = 0;
 
@@ -279,7 +273,7 @@ static FAR void *master_write_thread(FAR void *arg)
   while (count <= COUNT_OF_TEST)
     {
       sleep(1);
-      master_write_i2c(g_i2cwrite.master_fd, i++);
+      master_write_i2c(g_i2cwrite->master_fd, i++);
       count += 1;
     }
 
@@ -307,38 +301,61 @@ int main(int argc, FAR char *argv[])
       return -1;
     }
 
-  parse_commandline(&g_i2cwrite, argc, argv);
-  i2c_information(&g_i2cwrite);
-
-  g_i2cwrite.master_fd = open(g_i2cwrite.pathname_master, O_RDWR);
-
-  if (g_i2cwrite.master_fd < 0)
+  g_i2cwrite = calloc(1, sizeof(*g_i2cwrite));
+  if (g_i2cwrite == NULL)
     {
-      printf("open iic master failed\n");
+      printf("i2c state allocation failed\n");
       return -1;
     }
 
-  g_i2cwrite.slave_fd = open(g_i2cwrite.pathname_slave, O_RDWR);
+  strlcpy(g_i2cwrite->pathname_master, GET_I2C_MASTER_PATH,
+          sizeof(g_i2cwrite->pathname_master));
+  strlcpy(g_i2cwrite->pathname_slave, GET_I2C_SLAVE_PATH,
+          sizeof(g_i2cwrite->pathname_slave));
+  g_i2cwrite->addr = GET_I2C_SLAVE_ADDR;
+  g_i2cwrite->frequency = GET_I2C_FRE;
 
-  if (g_i2cwrite.slave_fd < 0)
+  parse_commandline(g_i2cwrite, argc, argv);
+  i2c_information(g_i2cwrite);
+
+  g_i2cwrite->master_fd = open(g_i2cwrite->pathname_master, O_RDWR);
+
+  if (g_i2cwrite->master_fd < 0)
     {
-      close(g_i2cwrite.master_fd);
+      printf("open iic master failed\n");
+      free(g_i2cwrite);
+      g_i2cwrite = NULL;
+      return -1;
+    }
+
+  g_i2cwrite->slave_fd = open(g_i2cwrite->pathname_slave, O_RDWR);
+
+  if (g_i2cwrite->slave_fd < 0)
+    {
+      close(g_i2cwrite->master_fd);
+      free(g_i2cwrite);
+      g_i2cwrite = NULL;
       printf("open iic slave failed\n");
       return -1;
     }
 
   if (pthread_create(&t_id1, NULL, slave_read_thread, NULL) < 0)
     {
-      close(g_i2cwrite.master_fd);
-      close(g_i2cwrite.slave_fd);
+      close(g_i2cwrite->master_fd);
+      close(g_i2cwrite->slave_fd);
+      free(g_i2cwrite);
+      g_i2cwrite = NULL;
       printf("slave_read_thread create failed\n");
       return -1;
     }
 
   if (pthread_create(&t_id2, NULL, master_write_thread, NULL) < 0)
     {
-      close(g_i2cwrite.master_fd);
-      close(g_i2cwrite.slave_fd);
+      pthread_join(t_id1, NULL);
+      close(g_i2cwrite->master_fd);
+      close(g_i2cwrite->slave_fd);
+      free(g_i2cwrite);
+      g_i2cwrite = NULL;
       printf("master_write_thread create failed\n");
       return -1;
     }
@@ -346,8 +363,10 @@ int main(int argc, FAR char *argv[])
   pthread_join(t_id1, NULL);
   pthread_join(t_id2, NULL);
 
-  close(g_i2cwrite.master_fd);
-  close(g_i2cwrite.slave_fd);
+  close(g_i2cwrite->master_fd);
+  close(g_i2cwrite->slave_fd);
+  free(g_i2cwrite);
+  g_i2cwrite = NULL;
 
   printf("i2c write test end\n");
   return 0;

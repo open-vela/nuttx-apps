@@ -46,6 +46,8 @@ CFLAGS += -DCJSON_INCLUDE_CONFIG_H
 CSRCS = $(CJSON_SRCDIR)$(DELIM)cJSON.c
 CSRCS += $(CJSON_SRCDIR)$(DELIM)cJSON_Utils.c
 
+MODULE = $(CONFIG_NETUTILS_CJSON)
+
 # Download and unpack tarball if no git repo found
 ifeq ($(wildcard $(CJSON_UNPACKNAME)/.git),)
 $(CJSON_TARBALL):

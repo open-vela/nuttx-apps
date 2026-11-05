@@ -41,6 +41,10 @@
 #include <nuttx/version.h>
 #include <nuttx/trace.h>
 
+#ifdef CONFIG_NSH_BUILTIN_AS_COMMAND
+#  include <nuttx/lib/builtin.h>
+#endif
+
 #include "nsh.h"
 #include "nsh_console.h"
 #include "nshlib/nshlib.h"
@@ -579,7 +583,11 @@ static int nsh_execute(FAR struct nsh_vtbl_s *vtbl,
    */
 
 #ifndef CONFIG_NSH_DISABLEBG
-  if (vtbl->np.np_bg)
+  if (vtbl->np.np_bg
+#ifdef CONFIG_NSH_BUILTIN_AS_COMMAND
+      && builtin_isavail(argv[0]) < 0
+#endif
+     )
     {
       FAR char *sh_argv[4];
       FAR char *sh_cmd = "sh";

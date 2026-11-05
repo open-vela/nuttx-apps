@@ -852,6 +852,11 @@ int main(int argc, FAR char *argv[])
                   continue;
                 }
 
+              if (arg == NULL)
+                {
+                  arg = "";
+                }
+
               /* Remove leading spaces from arg */
 
               while (*arg == ' ')
@@ -881,6 +886,11 @@ int main(int argc, FAR char *argv[])
 
                       break;
                     }
+                }
+
+              if (x == g_nxplayer_cmd_count)
+                {
+                  printf("%s: unknown nxplayer command\n", cmd);
                 }
             }
           else

@@ -20,7 +20,7 @@
 
 include $(APPDIR)/Make.defs
 
-# BLE Barometer sensor example built-in application info
+# BLE GATT echo example built-in application info
 
 PROGNAME = $(CONFIG_EXAMPLES_BLE_PROGNAME)
 PRIORITY = $(CONFIG_EXAMPLES_BLE_PRIORITY)
@@ -29,11 +29,5 @@ MODULE = $(CONFIG_EXAMPLES_BLE)
 
 CSRCS = ble.c
 MAINSRC = ble_main.c
-
-ifeq ($(CONFIG_EXAMPLES_BLE_USE_BME680),y)
-    CSRCS += sensors.c
-else
-    CSRCS += dummy.c
-endif
 
 include $(APPDIR)/Application.mk

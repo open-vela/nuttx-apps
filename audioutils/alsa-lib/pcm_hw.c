@@ -780,7 +780,125 @@ static snd_pcm_sframes_t snd_pcm_hw_writen(FAR snd_pcm_t *pcm,
                                            FAR void **bufs,
                                            snd_pcm_uframes_t size)
 {
-  return -ENOTSUP;
+  FAR const snd_pcm_channel_area_t *areas;
+  FAR const uint8_t *src;
+  FAR uint8_t *dst;
+  FAR uint8_t *out;
+  snd_pcm_uframes_t xfer = 0;
+  snd_pcm_uframes_t offset;
+  snd_pcm_uframes_t frames;
+  unsigned int sample_bytes;
+  unsigned int channel;
+  snd_pcm_uframes_t frame;
+  ssize_t len;
+  int ret = 0;
+
+  if (bufs == NULL || pcm->sample_bits == 0 ||
+      (pcm->sample_bits & 7) != 0)
+    {
+      return -EINVAL;
+    }
+
+  sample_bytes = pcm->sample_bits / 8;
+
+  for (channel = 0; channel < pcm->channels; channel++)
+    {
+      if (bufs[channel] == NULL)
+        {
+          return -EINVAL;
+        }
+    }
+
+  while (size > 0)
+    {
+      frames = size;
+      ret = snd_pcm_mmap_begin(pcm, &areas, &offset, &frames);
+      if (ret < 0)
+        {
+          break;
+        }
+
+      if (frames == 0)
+        {
+          if (pcm->mode & SND_PCM_NONBLOCK)
+            {
+              ret = -EAGAIN;
+              break;
+            }
+
+          ret = snd_pcm_wait(pcm, -1);
+          if (ret < 0)
+            {
+              break;
+            }
+
+          continue;
+        }
+
+      for (channel = 0; channel < pcm->channels; channel++)
+        {
+          if (((areas[channel].first | areas[channel].step) & 7) != 0)
+            {
+              ret = -ENOTSUP;
+              break;
+            }
+
+          src = (FAR const uint8_t *)bufs[channel] +
+                xfer * sample_bytes;
+          dst = (FAR uint8_t *)areas[channel].addr +
+                areas[channel].first / 8 +
+                offset * areas[channel].step / 8;
+
+          for (frame = 0; frame < frames; frame++)
+            {
+              memcpy(dst, src, sample_bytes);
+              src += sample_bytes;
+              dst += areas[channel].step / 8;
+            }
+        }
+
+      if (ret < 0)
+        {
+          break;
+        }
+
+      len = snd_pcm_frames_to_bytes(pcm, frames);
+      if (len < 0)
+        {
+          ret = len;
+          break;
+        }
+
+      out = (FAR uint8_t *)areas[0].addr + areas[0].first / 8 +
+            offset * areas[0].step / 8;
+
+      if (pcm->volume != 1.0)
+        {
+          snd_pcm_softvol_scale(pcm->format, pcm->volume, out,
+                                snd_pcm_bytes_to_samples(pcm, len));
+        }
+
+      ret = snd_pcm_mmap_commit(pcm, offset, frames);
+      if (ret < 0)
+        {
+          break;
+        }
+
+      size -= frames;
+      xfer += frames;
+
+      if (snd_pcm_state(pcm) == SND_PCM_STATE_PREPARED &&
+          pcm->period_size * pcm->appl >= pcm->start_threshold)
+        {
+          ret = snd_pcm_start(pcm);
+          if (ret < 0)
+            {
+              return ret;
+            }
+        }
+    }
+
+  return xfer > 0 ? xfer : ret;
 }
 
 static snd_pcm_sframes_t snd_pcm_hw_avail_update(FAR snd_pcm_t *pcm)

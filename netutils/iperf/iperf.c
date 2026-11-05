@@ -920,7 +920,11 @@ static void iperf_task_traffic(FAR void *arg)
 
 static uint32_t iperf_get_buffer_len(FAR struct iperf_ctrl_t *ctrl)
 {
-  if (iperf_is_udp_client(ctrl))
+  if (ctrl->cfg.buffer_len != 0)
+    {
+      return ctrl->cfg.buffer_len;
+    }
+  else if (iperf_is_udp_client(ctrl))
     {
       return IPERF_UDP_TX_LEN;
     }
