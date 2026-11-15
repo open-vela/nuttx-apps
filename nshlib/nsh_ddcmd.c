@@ -253,6 +253,63 @@ static int dd_verify(FAR const char *infile, FAR const char *outfile,
 }
 
 /****************************************************************************
+ * Name: dd_atoi
+ *
+ * Description:
+ *   Parse a dd numeric operand the way GNU dd does: a decimal number
+ *   optionally followed by a multiplicative suffix (b=512, w=2, k/K=1024,
+ *   M=1024*1024, G=1024*1024*1024).  Plain atoi() silently truncates
+ *   "bs=64k" to 64.
+ *
+ ****************************************************************************/
+
+static unsigned long dd_atoi(FAR const char *arg)
+{
+  unsigned long value;
+  FAR char *end;
+
+  value = strtoul(arg, &end, 10);
+  if (end == arg || end == NULL)
+    {
+      return 0;
+    }
+
+  switch (*end)
+    {
+      case 'b':
+      case 'B':
+        value *= 512;
+        break;
+
+      case 'w':
+      case 'W':
+        value *= 2;
+        break;
+
+      case 'k':
+      case 'K':
+        value *= 1024;
+        break;
+
+      case 'm':
+      case 'M':
+        value *= 1024ul * 1024ul;
+        break;
+
+      case 'g':
+      case 'G':
+        value *= 1024ul * 1024ul * 1024ul;
+        break;
+
+      case '\0':
+      default:
+        break;
+    }
+
+  return value;
+}
+
+/****************************************************************************
  * Public Functions
  ****************************************************************************/
 
@@ -324,19 +381,19 @@ int cmd_dd(FAR struct nsh_vtbl_s *vtbl, int argc, FAR char **argv)
         }
       else if (strncmp(argv[i], "bs=", 3) == 0)
         {
-          dd.sectsize = atoi(&argv[i][3]);
+          dd.sectsize = dd_atoi(&argv[i][3]);
         }
       else if (strncmp(argv[i], "count=", 6) == 0)
         {
-          dd.nsectors = atoi(&argv[i][6]);
+          dd.nsectors = dd_atoi(&argv[i][6]);
         }
       else if (strncmp(argv[i], "skip=", 5) == 0)
         {
-          dd.skip = atoi(&argv[i][5]);
+          dd.skip = dd_atoi(&argv[i][5]);
         }
       else if (strncmp(argv[i], "seek=", 5) == 0)
         {
-          dd.seek = atoi(&argv[i][5]);
+          dd.seek = dd_atoi(&argv[i][5]);
         }
       else if (strncmp(argv[i], "verify", 6) == 0)
         {
