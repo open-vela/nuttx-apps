@@ -1,0 +1,23 @@
+#
+# For a description of the syntax of this configuration file,
+# see the file kconfig-language.txt in the NuttX tools repository.
+#
+
+config EXAMPLES_MMCDIAG
+	tristate "H616 eMMC raw-register diagnostic"
+	default n
+	---help---
+		Raw sunxi-mmc controller register test (H616 sdc2).  For bring-up
+		debugging only.
+
+if EXAMPLES_MMCDIAG
+
+config EXAMPLES_MMCDIAG_PROGNAME
+	string "Program name"
+	default "mmcdiag"
+
+config EXAMPLES_MMCDIAG_STACKSIZE
+	int "Stack size"
+	default 4096
+
+endif
